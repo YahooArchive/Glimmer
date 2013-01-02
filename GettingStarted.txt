@@ -1,8 +1,8 @@
 Welcome to Glimmer
 ------------------
 
- Glimmer is a Hadoop based distributed indexing system for building MG4J indexes from RDF tuples in NQuads format.  It also includes a simple web application
- for querying the resulting indexes <TODO +something about this+scorer..).  Both the indexing and web application are written in Java.  There are also a few 
+ Glimmer is a Hadoop based distributed indexing system for building MG4J indexes from RDF tuples in NQuad format.  It also includes a simple web application
+ for querying the resulting indexes (TODO +something about this+scorer..).  Both the indexing and web application are written in Java.  There are also a few 
  shell scripts to execute the steps need to build the indexes for a given NQuads file and query the resulting index from the command line.
  
  Glimmer is an academic project and is the implementation of distributed indexing detailed in the paper
@@ -11,12 +11,12 @@ Welcome to Glimmer
 Prerequisites
 -------------
 - Java JDK 6. Other versions may work. The code was written against version 1.6.0_31
-  Note that MG4J 5.1 uses memory mapped local file access on the local machine and a bit in Hadoop. For building indexes to work well use a version of Java that has a 64bit data model
+  Note that MG4J 5.1 uses memory mapped local file access on the local machine and a bit in Hadoop. For index building to work well, use a version of Java that has a 64bit data model
   You will possibly get Map failed errors otherwise.  Especially when merging lots of indexes.
-- A Maven installation.  We used version 3.0.3 during development.
+- A Maven installation.  Version 3.0.3 was used during development.
 - A Hadoop cluster. Probably version 0.23.x. The version of Hadoop we developed the code with is defined in the pom.xml file.
 - If you want try out the web app an install of a Java servlet container such as Tomcat, Jetty etc..
-- If you want a more usable interface to the MG4J query command-line you can install rlwrap to get command-line history/editing.
+- If you want a more usable interface to the MG4J query command-line you can install rlwrap to get command-line history and editing.
 
 All other dependencies are jars that are automatically downloaded by Maven.
 
@@ -30,12 +30,12 @@ In the root directory of Glimmer run:
 	mvn compile (or mvn test)
 	mvn assembly:single
 
-This will produce a jar Glimmer-?.?.?-SNAPSHOT-jar-with-dependencies.jar in the ./target directory. This jar contains the Glimmer classes + all dependencies zipped into one file.
+This will produce a jar Glimmer-?.?.?-SNAPSHOT-jar-for-hadoop.jar in the ./target directory. This jar contains the Glimmer classes + all dependencies needed for Hadoop zipped into one file.
 
 2. The process of building an index with Glimmer consists of the following steps.  (The build-index.sh shell script is provided to automate the process.)
 
-* Preprocess the NQuads tuple file to get:
-  - A sorted unique list by subject with the subjects associated predicates, object, context. 
+* Preprocess the NQuad tuples file to get:
+  - A sorted unique list of subjects with the subject's associated predicates, objects and contexts.
   - A sorted unique list of subjects resources.
   - A sorted unique list of predicates resources.
   - A sorted unique list of all resources(Subject, Predicate, Object & Context).
@@ -56,9 +56,11 @@ Querying
 
 Once you have the indexes build you can use the MG4J query command line class it.unimi.di.mg4j.query.Query to query them.  You may find the query-index.sh script helpful here.
 
-You can also setup, build and deploy the Java web application as follows:
+You can also build and deploy the Java web application as follows:
 
-1. Configure where your indexes are in src/main/webapp/WEB-INF/classes/config-generic.properties.  The directories found in the directory given by 'multiindex.path' property and that have names starting with the 'multiindex.dirprefix' property are treated as MG4J indexes.  The names will appear in the Dataset dropdown in the webapp.
+1. Configure where your indexes are in src/main/webapp/WEB-INF/classes/config-generic.properties.  
+   The directories found in the directory given by 'multiindex.path' property and that have names starting with the
+   'multiindex.dirprefix' property are treated as MG4J indexes.  The names will appear in the Dataset dropdown in the webapp.
  
 2. Use the maven-war-plugin to build the war file.  From the projects root directory run the command
 
