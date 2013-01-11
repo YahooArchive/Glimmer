@@ -46,17 +46,17 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("@45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("60", word.toString());
+	assertEquals("@60", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals("22", word.toString());
+	assertEquals("@22", word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("@46", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("61", word.toString());
+	assertEquals("@61", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
@@ -66,27 +66,27 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("62", word.toString());
+	assertEquals("@62", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals("55", word.toString());
+	assertEquals("@55", word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("62", word.toString());
+	assertEquals("@62", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals("55", word.toString());
+	assertEquals("@55", word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
-	assertEquals("88", word.toString());
+	assertEquals("@88", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("63", word.toString());
+	assertEquals("@63", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
@@ -130,7 +130,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("@45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("60", word.toString());
+	assertEquals("@60", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
@@ -140,7 +140,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("@46", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("61", word.toString());
+	assertEquals("@61", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
@@ -150,7 +150,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("62", word.toString());
+	assertEquals("@62", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
@@ -160,17 +160,17 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("62", word.toString());
+	assertEquals("@62", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
-	assertEquals("88", word.toString());
+	assertEquals("@88", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("63", word.toString());
+	assertEquals("@63", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
