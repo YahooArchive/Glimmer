@@ -27,15 +27,20 @@ import java.util.TreeSet;
  */
 public class RDFIndexStatistics {
     public static class ClassStat {
+	private final String localName;
 	private final int count;
 	private int inheritedCount;
 	private String label;
 	private List<String> properties;
 	private Set<String> children;
 	
-	public ClassStat(int count) {
+	public ClassStat(String localName, int count) {
+	    this.localName = localName;
 	    this.count = count;
 	    inheritedCount = count;
+	}
+	public String getLocalName() {
+	    return localName;
 	}
 	public int getCount() {
 	    return count;

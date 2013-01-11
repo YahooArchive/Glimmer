@@ -13,7 +13,7 @@ String.prototype.startsWith = function(str) {
 	return (this.match("^" + str) == str)
 }
 
-var stats = {};
+var stats;
 var fieldShortNames;
 var fieldLongNames;
 var store = {};
@@ -106,7 +106,7 @@ YUI({
 				},
 				on: {
 					success : function(transactionid, response, arguments) {
-						var stats = Y.JSON.parse(response.response);
+						stats = Y.JSON.parse(response.response);
 
 						Y.one("#class-loader").hide();
 						Y.one("#class-message").setContent("");
@@ -131,65 +131,91 @@ YUI({
 						});
 
 						// Display class selection dropdown
-						if (stats.classes != undefined) {
+						if (stats.classes == undefined) {
+							// Render TreeView
+							Y.one('#statistics-tree').setContent('<p>There are no rdf:type tuples in this dataset.</p>');
+							
+							// Hide Ontology Search box
+							Y.one('#ontologysearch').hide();
+							
+						} else {
+							var classesWithProperties = [];
+							for (className in stats.classes) {
+								var clazz = stats.classes[className];
+								// Add className field to each class.
+								clazz.className = className;
+								
+								// Change all children class names to references +
+								// for all classes that are children add a ref to the parent classes.
+								for (i in clazz.children) {
+									var childName = clazz.children[i];
+									var childClass = stats.classes[childName];
+									clazz.children[i] = childClass;
+									if (childClass.parents == undefined) {
+										childClass.parents = [];
+									}
+									childClass.parents.push(clazz);
+								}
+								
+								// get classes with properties.
+								if (clazz.properties != undefined) {
+									classesWithProperties.push(clazz);
+								}
+							}
+							
+							// Sort by the local name
+							classesWithProperties.sort(function(a,b) {
+							    if(a.localName<b.localName) return -1;
+							    if(a.localName>b.localName) return 1;
+							    return 0;
+							})
+							
 							var frag = '<select>';
-							var keys = [];
-							for ( var key in stats.classes) {
-								keys.push(key);
+							for (i in classesWithProperties) {
+								clazz = classesWithProperties[i];
+								frag = frag + "<option value='" + i + "'>" + clazz.localName + " - " + clazz.className + "</option>";
 							}
-							keys.sort();
-							for (clazz in keys) {
-								frag = frag + "<option value='" + keys[clazz] + "'>" + getLocalName(keys[clazz]) + "</option>";
-							}
-
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
 							Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
-							changeProperties(keys[0]);
+							
+							changeProperties(classesWithProperties[0]);
 							fragNode.on('change', function(e) {
-								changeProperties(e.target.get('value').properties);
+								var i = e.target.get('value');
+								changeProperties(classesWithProperties[i]);
 							});
 
 							var tree = [];
 							function addClass(clazz) {
 								var rt = {};
-								if (stats.classes[clazz] != undefined) {
-									var stat = stats.classes[clazz];
-									rt['label'] = getLocalName(clazz) + " " + stat.inheritedCount;
-									if (stat.inheritedCount != stat.count) {
-										rt['label'] +=  "(" + stat.count + ")";
-									}
-									
-									var children = [];
-									for (uri in stats.classes[clazz].children) {
-										var child = stats.classes[clazz].children[uri];
-										if (stats.classes[child] != undefined) {
-											children.push(addClass(child));
-										}
-									}
-									if (children.length > 0) {
-										rt['type'] = 'TreeView';
-										rt['children'] = children
-									}
+								
+								if (clazz == undefined) {
+									return rt;
+								}
+								
+								rt['label'] = clazz.localName + " " + clazz.inheritedCount;
+								if (clazz.inheritedCount != clazz.count) {
+									rt['label'] +=  "(" + clazz.count + ")";
+								}
+								
+								var children = [];
+								for (i in clazz.children) {
+									var childClass = clazz.children[i];
+									children.push(addClass(childClass));
+								}
+								if (children.length > 0) {
+									rt['type'] = 'TreeView';
+									rt['children'] = children
 								}
 								return rt;
-								if (sub.length > 0) {
-									return {
-										label : getLocalName(clazz) + " (" + count + ") ",
-										type : "TreeView",
-										children : sub
-									};
-								} else {
-									return {
-										label : getLocalName(clazz) + " (" + count + ") "
-									};
-								}
 							}
 	
 							// Render TreeView
 							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
 							for (i in stats.rootClasses) {
-								tree.push(addClass(stats.rootClasses[i]));
+								var className = stats.rootClasses[i];
+								var clazz = stats.classes[className];
+								tree.push(addClass(clazz));
 							}
 							var treeview = new Y.TreeView({
 								srcNode : '#statisticsTreeList',
@@ -201,6 +227,20 @@ YUI({
 							treeview.render();
 							// Expand the top level of the tree
 							Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
+							
+							// Toggle ontology search box
+							Y.one('#ontologysearch').show();
+							Y.one('#toggleonto').on('click', function(e) {
+								var node = Y.one('#onto-hider');
+								var button = Y.one('#toggleonto');
+								if (button.getContent() == "Hide") {
+									node.hide();
+									button.setContent("Show");
+								} else {
+									node.show();
+									button.setContent("Hide");
+								}
+							});
 						}
 
 						// Render statistics box
@@ -286,7 +326,10 @@ YUI({
 						Y.one("#results").setContent("").append(ol);
 					},
 					failure : function(transactionid, response, arguments) {
-						var message = Y.JSON.parse(response.response);
+						var message = "";
+						if (response != undefined) {
+							message = Y.JSON.parse(response.response);
+						}
 						alert("Failed to get results from server. " + message);
 						Y.one("#result-loader").hide();
 						Y.one("#resultContainer").hide();
@@ -408,15 +451,37 @@ YUI({
 			return value;
 		}
 
-		function changeProperties(properties) {
+		function changeProperties(clazz) {
+			var properties = [];
+			
+			var classes = [];
+			classes.push(clazz);
+			
+			while (classes.length > 0) {
+				var clazz = classes.shift();
+				if (clazz.properties != undefined) {
+					for (var i in clazz.properties) {
+						var propertyName = clazz.properties[i];
+						if (properties.indexOf(propertyName) == -1) {
+							properties.push(propertyName);
+						}
+					}
+				}
+				if (clazz.parents != undefined) {
+					classes = classes.concat(clazz.parents);
+				}
+			}
+			
+			properties.sort();
+				
 			Y.one('#class-properties').setContent('');
 			var frag = '<table>';
-			if (properties != undefined) {
-				for ( var i in properties) {
-					frag = frag + '<tr><td>' + getLocalName(properties[i])
-							+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
-							+ getLocalName(properties[i]) + '"/></td></tr>';
-				}
+			for (var i in properties) {
+				var property = properties[i];
+				
+				frag = frag + '<tr><td>' + property
+						+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
+						+ property + '"/></td></tr>';
 			}
 			frag = frag + '</table>';
 			Y.one('#class-properties').append(Y.Node.create(frag)).show();
@@ -491,19 +556,6 @@ YUI({
 
 		// On submit, retrieve and display search results
 		Y.one('#unifiedsearchform').on('submit', executeUnifiedSearch);
-
-		// Toggle ontology search box
-		Y.one('#toggleonto').on('click', function(e) {
-			var node = Y.one('#onto-hider');
-			var link = Y.one('#toggleonto');
-			if (link.getContent() == "hide") {
-				node.hide();
-				link.setContent("show");
-			} else {
-				node.show();
-				link.setContent("hide");
-			}
-		});
 
 		var tabview = new Y.TabView({
 			srcNode : '#resultContainer'

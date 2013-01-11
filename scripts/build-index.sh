@@ -10,28 +10,29 @@
 #  See accompanying LICENSE file.
 #
 
-INPUT_ARG=${1}
-if [ -z ${INPUT_ARG} ] ; then
-	echo Usage: "${0} <tuple file on local disk or HDFS> [build name] [no. sub indices]"
+if [ "$#" -le 2 ] ; then
+	echo Usage: "${0} <tuple file on local disk or HDFS> <build name> [tuple filter xml file] [no. sub indices]"
 	exit 1
 fi
+INPUT_ARG=${1}
+BUILD_NAME=${2}
 
-BUILD_NAME="tmp"
-if [ ! -z ${2} ] ; then
-	BUILD_NAME=${2}
-fi
-
-SUBINDICES=20
+# Optionally set PrepTool's tuple filter definition file.  This is a file containing an XStream serialized instance of a TupleFilter.
+# See TestTupleFilter.xml or SchemaDotOrgRegexTupleFilter.xml as examples and http://xstream.codehaus.org/converters.html.
+PREP_FILTER_FILE=""
 if [ ! -z ${3} ] ; then
-	SUBINDICES=${3}
+	PREP_FILTER_FILE=${3}
 fi
+
+# Optionally set the number of reducers to use when generating indexes.
+SUBINDICES=20
+if [ ! -z ${4} ] ; then
+	SUBINDICES=${4}
+fi
+
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
-# Optionally set PrepTool's tuple filter definition file.  This is a file containing an XStream serialized instance of a TupleFilter.
-# See SchemaDotOrgRegexTupleFilter.xml as an example and http://xstream.codehaus.org/converters.html.
-#PREP_FILTER_FILE="SchemaDotOrgTupleFilter.xml"
-PREP_FILTER_FILE="TestTupleFilter.xml"
 
 # Number of predicates to use when building vertical indexes.  
 # The occurrences of predicates found in the source tuples are counted and then sorted by occurrence count.
@@ -52,6 +53,15 @@ LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 
 QUEUE=${QUEUE:-default}
 
+echo
+echo "Using ${INPUT_ARG} as input.."
+if [ ! -z ${PREP_FILTER_FILE} ] ; then
+    echo "filtering by ${PREP_FILTER_FILE}.."
+fi
+echo "reducing into ${SUBINDICES} sub indices.."
+echo "and writing output to ${LOCAL_BUILD_DIR}."
+echo
+
 JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
 HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
@@ -60,7 +70,6 @@ COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_COD
 
 HASH_EXTENSION=".smap"
 
-#INDEX_FILE_EXTENSIONS="frequencies index offsets positions posnumbits properties stats termmap terms"
 INDEX_FILE_EXTENSIONS="counts countsoffsets frequencies occurrencies pointers pointersoffsets positions positionsoffsets properties sumsmaxpos terms"
 
 if [ ! -f ${JAR_FOR_HADOOP} ] ; then
@@ -152,7 +161,6 @@ fi
 function groupBySubject () {
 	local INPUT_FILE=${1}
 	local PREP_DIR=${2}
-	local REDUCER_TASKS=${3}
 	echo Processing tuples from file ${INPUT_FILE}...
 	echo
 	
@@ -463,7 +471,7 @@ function buildCollection () {
 	${CMD}
 }
 
-groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
+groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep
 computeHashes ${DFS_BUILD_DIR}/prep/all
 
 getDocCount ${DFS_BUILD_DIR}/prep

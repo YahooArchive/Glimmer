@@ -14,7 +14,12 @@ package com.yahoo.glimmer.indexing.preprocessor;
 import org.semanticweb.yars.nx.Resource;
 
 public class PredicatePrefixTupleFilter implements TupleFilter {
-    private String urlPrefix;
+    private static final String RDF_SYNTAX_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+    private static final String RDF_SCHEMA_NS = "http://www.w3.org/2000/01/rdf-schema#";
+    private static final String OWL_NS = "http://www.w3.org/2002/07/owl#";
+
+    private String predicatePrefix;
+    private String rdfTypePrefix;
     private boolean filterNonMatches;
     private boolean lowercase;
     private StringBuilder sb;
@@ -23,9 +28,13 @@ public class PredicatePrefixTupleFilter implements TupleFilter {
 	readResolve();
     }
 
-    public void setUrlPrefix(String urlPrefix) {
-	this.urlPrefix = urlPrefix;
+    public void setPredicatePrefix(String predicatePrefix) {
+	this.predicatePrefix = predicatePrefix;
 	readResolve();
+    }
+
+    public void setRdfTypePrefix(String rdfTypePrefix) {
+	this.rdfTypePrefix = rdfTypePrefix;
     }
 
     public void setLowercase(boolean lowercase) {
@@ -40,52 +49,77 @@ public class PredicatePrefixTupleFilter implements TupleFilter {
     // constructor aren't used used.
     // XStream uses the same mechanism as the JDK serialization.
     private Object readResolve() {
-	if (urlPrefix != null) {
-	    sb = new StringBuilder(urlPrefix);
+	if (predicatePrefix != null) {
+	    sb = new StringBuilder(predicatePrefix);
 	}
 	return this;
     }
 
+    // TODO.  simplify logic...
     @Override
     public boolean filter(Tuple tuple) {
 	if (tuple.predicate.type != TupleElement.Type.RESOURCE) {
 	    return false;
 	}
 
-	String text = tuple.predicate.text;
-	
-	if (tuple.predicate.text.startsWith(urlPrefix)) {
-	    if (lowercase) {
-		text = text.toLowerCase();
-	    }
-	    int end = text.length();
-	    while (text.charAt(--end) == '/') {
-	    }
+	String predicateText = tuple.predicate.text;
+	if (predicateText.startsWith(RDF_SCHEMA_NS) || predicateText.startsWith(OWL_NS)) {
+	    return true;
+	}
 
-	    int start = text.lastIndexOf('/', end) + 1;
-	    if (start > urlPrefix.length()) {
-		// remove path
-		sb.setLength(urlPrefix.length());
-		sb.append(tuple.predicate.text.substring(start, end + 1));
-		text = sb.toString();
+	if (predicateText.startsWith(RDF_SYNTAX_NS)) {
+	    if (rdfTypePrefix != null) {
+		if (!tuple.object.text.startsWith(rdfTypePrefix)) {
+		    return false;
+		}
+
+		String objectText = rewriteResource(tuple.object.text, rdfTypePrefix);
+		if (!objectText.equals(tuple.object.text)) {
+		    tuple.object.text = objectText.toLowerCase();
+		    tuple.object.n3 = new Resource(tuple.object.text).toN3();
+		}
 	    }
-	    if (!text.equals(tuple.predicate.text)) {
-		tuple.predicate.text = text.toLowerCase();
+	    return true;
+	}
+
+	if (tuple.predicate.text.startsWith(predicatePrefix)) {
+	    predicateText = rewriteResource(predicateText, predicatePrefix);
+	    if (!predicateText.equals(tuple.predicate.text)) {
+		tuple.predicate.text = predicateText.toLowerCase();
 		tuple.predicate.n3 = new Resource(tuple.predicate.text).toN3();
 	    }
 	    return true;
 	} else if (!filterNonMatches) {
 	    if (lowercase) {
-		text = tuple.predicate.text.toLowerCase();
+		predicateText = tuple.predicate.text.toLowerCase();
 	    }
 	} else {
 	    return false;
 	}
-	
-	if (!text.equals(tuple.predicate.text)) {
-	    tuple.predicate.text = text;
-	    tuple.predicate.n3 = new Resource(text).toN3();
+
+	if (!predicateText.equals(tuple.predicate.text)) {
+	    tuple.predicate.text = predicateText;
+	    tuple.predicate.n3 = new Resource(predicateText).toN3();
 	}
 	return true;
+    }
+
+    private String rewriteResource(String url, String removeUrlPrefix) {
+	String s = url;
+	if (lowercase) {
+	    s = s.toLowerCase();
+	}
+	int end = s.length();
+	while (s.charAt(--end) == '/') {
+	}
+
+	int start = s.lastIndexOf('/', end) + 1;
+	if (start > removeUrlPrefix.length()) {
+	    // remove path
+	    sb.setLength(removeUrlPrefix.length());
+	    sb.append(url.substring(start, end + 1));
+	    s = sb.toString();
+	}
+	return s;
     }
 }

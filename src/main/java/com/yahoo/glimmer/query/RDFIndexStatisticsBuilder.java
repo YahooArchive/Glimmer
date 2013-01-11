@@ -80,7 +80,8 @@ public class RDFIndexStatisticsBuilder {
 	// Capture basic statistics about class frequency
 	for (String clazzName : typeTermDistribution.keySet()) {
 	    Integer count = typeTermDistribution.get(clazzName);
-	    stats.addClassStat(removeVersion(clazzName), new ClassStat(count));
+	    String localName = OwlUtils.getLocalName(IRI.create(clazzName));
+	    stats.addClassStat(removeVersion(clazzName), new ClassStat(localName, count));
 	}
 
 	if (ontology != null && stats.getClasses() != null) {
@@ -175,7 +176,8 @@ public class RDFIndexStatisticsBuilder {
 		    // Is is possible the the super class doesn't have a
 		    // ClassStat object as we start with only
 		    // ClassStat objects for things that are index.
-		    superStat = new ClassStat(0);
+		    String superLocalName = OwlUtils.getLocalName(superOwlClass.getIRI());
+		    superStat = new ClassStat(superLocalName,0);
 		    superStat.setLabel(OwlUtils.getLabel(superOwlClass, ontology));
 		    stats.addClassStat(superOwlClassName, superStat);
 		    nameToOwlClassMap.put(superOwlClassName, superOwlClass);

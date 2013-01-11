@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.namespace.RDF;
 
@@ -71,21 +72,19 @@ class VerticalDocument extends RDFDocument {
 		continue;
 	    }
 	    
+	    if (predicate.equals(RDF.TYPE.toString())) {
+		factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
+	    }
+	    
 	    List<String> fieldForPredicate = fields.get(fieldIndex);
 
-	    if (relation.getObject() instanceof Resource) {
-		// For all fields except type, encode the resource URI
-		// or bnode ID using the resources hash
-		if (predicate.equals(RDF.TYPE.toString())) {
-		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-		    fieldForPredicate.add(relation.getObject().toString());
-		} else {
-		    String objectId = factory.lookupResource(relation.getObject().toString(), true);
-		    if (objectId == null) {
-			throw new IllegalStateException("Object " + relation.getObject().toString() + " not in resources hash function!");
-		    }
-		    fieldForPredicate.add(objectId);
+	    if (relation.getObject() instanceof Resource || relation.getObject() instanceof BNode) {
+		// Encode the resource URI or bnode ID using the resources hash
+		String objectId = factory.lookupResource(relation.getObject().toString(), true);
+		if (objectId == null) {
+		    throw new IllegalStateException("Object " + relation.getObject().toString() + " not in resources hash function!");
 		}
+		fieldForPredicate.add(objectId);
 	    } else {
 		String object = relation.getObject().toString();
 

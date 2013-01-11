@@ -67,6 +67,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.yahoo.glimmer.indexing.ResourceRefTermProcessor;
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
@@ -277,7 +278,7 @@ public class RDFIndex {
 	    if (typeField == null) {
 		typeTermDistribution = Collections.emptyMap();
 	    } else {
-		typeTermDistribution = Collections.unmodifiableMap(getTermDistribution(typeField, false));
+		typeTermDistribution = Collections.unmodifiableMap(getTermDistribution(typeField, true));
 	    }
 	} catch (IOException e) {
 	    throw new RDFIndexException(e);
@@ -691,11 +692,17 @@ public class RDFIndex {
 
 	Map<String, Integer> histogram = new HashMap<String, Integer>();
 
+	String hashValuePrefix = index.properties.getString(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, "@");
+	
 	for (CharSequence term : termMap.list()) {
 	    long docId = termMap.get(term);
 	    IndexIterator it = index.documents(((int) docId));
 	    if (termsAreResourceIds) {
-		int termAsId = Integer.parseInt(term.toString());
+		String termString = term.toString();
+		if (!termString.startsWith(hashValuePrefix)) {
+		    throw new RuntimeException("Expected resource id " + termString + " to be prefix with " + hashValuePrefix);
+		}
+		int termAsId = Integer.parseInt(termString.substring(hashValuePrefix.length()));
 		histogram.put(lookupResourceById(termAsId), it.frequency());
 	    } else {
 		histogram.put(term.toString(), it.frequency());

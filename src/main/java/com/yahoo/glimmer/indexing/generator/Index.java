@@ -60,6 +60,7 @@ public class Index {
 	this.name = indexName.replaceAll("\\-", "_");
 	this.numDocs = numDocs;
 	this.positions = positions;
+	this.hashValuePrefix = hashValuePrefix;
 	if (indexWriterCacheSize != 0) {
 	    this.indexWriterCacheSize = indexWriterCacheSize;
 	}
@@ -112,7 +113,7 @@ public class Index {
 	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.MAXCOUNT, -1);
 	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.FIELD, name);
 	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMPROCESSOR, CombinedTermProcessor.getInstance());
-	    props.setProperty(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, hashValuePrefix);
+	    props.addProperty(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, hashValuePrefix);
 
 	    props.save(properties);
 	} catch (ConfigurationException e) {

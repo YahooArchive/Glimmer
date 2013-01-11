@@ -23,10 +23,10 @@ public class RDFQueryResult {
     private final String query;
     private final String parsedQuery;
 
-    public RDFQueryResult(String query, String parsedQuery, List<RDFResultItem> resultItems, int time) {
+    public RDFQueryResult(String query, String parsedQuery, int numResults, List<RDFResultItem> resultItems, int time) {
 	super();
 	this.resultItems = resultItems;
-	this.numResults = resultItems.size();
+	this.numResults = numResults;
 	this.time = time;
 	this.query = query != null ? query : "";
 	this.parsedQuery = parsedQuery;

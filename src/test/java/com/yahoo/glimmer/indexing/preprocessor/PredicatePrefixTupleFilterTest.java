@@ -14,7 +14,6 @@ package com.yahoo.glimmer.indexing.preprocessor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -26,7 +25,7 @@ public class PredicatePrefixTupleFilterTest {
     @Before
     public void before() {
 	filter = new PredicatePrefixTupleFilter();
-	filter.setUrlPrefix("http://schema.org/");
+	filter.setPredicatePrefix("http://schema.org/");
 	filter.setFilterNonMatches(true);
 	filter.setLowercase(true);
 	tuple = new Tuple();
@@ -40,50 +39,51 @@ public class PredicatePrefixTupleFilterTest {
 	assertNull(tuple.predicate.n3);
 	
 	tuple.predicate.type = TupleElement.Type.RESOURCE;
-	tuple.predicate.text = "http://not.schema.org/Path";
-	tuple.predicate.n3 = "<http://not.schema.org/Path>";
-	assertFalse(filter.filter(tuple));
+	
+	filter("http://not.schema.org/Path", false, "http://not.schema.org/Path");
 	// Should be unchanged.
 	assertEquals(TupleElement.Type.RESOURCE, tuple.predicate.type);
-	assertEquals("http://not.schema.org/Path", tuple.predicate.text);
-	assertEquals("<http://not.schema.org/Path>", tuple.predicate.n3);
 	
-	tuple.predicate.text = "http://schema.org/path";
-	tuple.predicate.n3 = "<http://schema.org/path>";
-	assertTrue(filter.filter(tuple));
-	assertEquals(TupleElement.Type.RESOURCE, tuple.predicate.type);
-	assertEquals("http://schema.org/path", tuple.predicate.text);
-	assertEquals("<http://schema.org/path>", tuple.predicate.n3);
+	// Permits rdf:*
+	filter("http://www.w3.org/1999/02/22-rdf-syntax-ns#", true, "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+	filter("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", true, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+	filter("http://www.w3.org/1999/02/22-rdf-syntax-nslabel", false, "http://www.w3.org/1999/02/22-rdf-syntax-nslabel");
 	
-	tuple.predicate.text = "http://schema.org/path/property";
-	tuple.predicate.n3 = "<http://schema.org/path/property>";
-	assertTrue(filter.filter(tuple));
-	assertEquals("http://schema.org/property", tuple.predicate.text);
-	assertEquals("<http://schema.org/property>", tuple.predicate.n3);
+	filter.setRdfTypePrefix("http://not.schema.org/");
+	tuple.object.text = "not an schema,org rdfType";
+	filter("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", false, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+	tuple.object.text = "http://not.schema.org/Author";
+	filter("http://www.w3.org/1999/02/22-rdf-syntax-ns#type", true, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 	
-	tuple.predicate.text = "http://schema.org/a/longer/path/property";
-	tuple.predicate.n3 = "<http://schema.org/a/longer/path/property>";
-	assertTrue(filter.filter(tuple));
-	assertEquals("http://schema.org/property", tuple.predicate.text);
-	assertEquals("<http://schema.org/property>", tuple.predicate.n3);
+	// Permits rdfs:*
+	filter("http://www.w3.org/2000/01/rdf-schema#", true, "http://www.w3.org/2000/01/rdf-schema#");
+	filter("http://www.w3.org/2000/01/rdf-schema#comment", true, "http://www.w3.org/2000/01/rdf-schema#comment");
+	filter("http://www.w3.org/2000/01/rdf-schemaAAA", false, "http://www.w3.org/2000/01/rdf-schemaAAA");
 	
-	tuple.predicate.text = "http://schema.org";
-	tuple.predicate.n3 = "<http://schema.org>";
-	assertFalse(filter.filter(tuple));
-	assertEquals("http://schema.org", tuple.predicate.text);
-	assertEquals("<http://schema.org>", tuple.predicate.n3);
+	// Permits owl:*
+	filter("http://www.w3.org/2002/07/owl#", true, "http://www.w3.org/2002/07/owl#");
+	filter("http://www.w3.org/2002/07/owl#Ontology", true, "http://www.w3.org/2002/07/owl#Ontology");
+	filter("http://www.w3.org/2002/07/owl", false, "http://www.w3.org/2002/07/owl");
 	
-	tuple.predicate.text = "http://schema.org/";
-	tuple.predicate.n3 = "<http://schema.org/>";
-	assertTrue(filter.filter(tuple));
-	assertEquals("http://schema.org/", tuple.predicate.text);
-	assertEquals("<http://schema.org/>", tuple.predicate.n3);
+	filter("http://schema.org/path", true, "http://schema.org/path");
+	
+	filter("http://schema.org/path/property", true, "http://schema.org/property");
+	
+	filter("http://schema.org/a/longer/path/property", true, "http://schema.org/property");
+	
+	filter("http://schema.org", false, "http://schema.org");
+	
+	filter("http://schema.org/", true, "http://schema.org/");
 	
 	// Should try and do something sensible when given nonsense
-	tuple.predicate.text = "http://schema.org/a/longer/path/nonsense/";
-	tuple.predicate.n3 = "<http://schema.org/a/longer/path/nonsense/>";
-	assertTrue(filter.filter(tuple));
-	assertEquals("http://schema.org/nonsense", tuple.predicate.text);
-	assertEquals("<http://schema.org/nonsense>", tuple.predicate.n3);
+	filter("http://schema.org/a/longer/path/nonsense/", true, "http://schema.org/nonsense");
+    }
+    
+    private void filter(String predicateIn, boolean accept, String predicateOut) {
+	tuple.predicate.text = predicateIn;
+	tuple.predicate.n3 = "<" + predicateIn + ">";
+	assertEquals(accept, filter.filter(tuple));
+	assertEquals(predicateOut, tuple.predicate.text);
+	assertEquals("<" + predicateOut + ">", tuple.predicate.n3);
     }
 }

@@ -81,9 +81,14 @@
 }
 
 #toggleonto {
-	font-size: 12pt;
 	color: #3A4956;
-	text-decoration: underline
+	font-family: 'Lucida Grande';
+	font-size: 11px;
+	color: #3A4956;
+	position: relative;
+	left: 190px;
+	top: -20px;
+	margin-bottom: -20px;
 }
 
 #pageHeader {
@@ -250,7 +255,7 @@ hr {
 }
 
 p {
-	margin: 1em 0 0 0;
+	margin: 1em;
 }
 
 pre {

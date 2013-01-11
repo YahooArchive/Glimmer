@@ -1,5 +1,6 @@
 <com.yahoo.glimmer.indexing.preprocessor.PredicatePrefixTupleFilter>
-	<urlPrefix>http://schema.org/</urlPrefix>
+	<predicatePrefix>http://schema.org/</predicatePrefix>
+	<rdfTypePrefix>http://schema.org/</rdfTypePrefix>
 	<filterNonMatches>true</filterNonMatches>
-	<lowercase>true</lowercase>
+	<lowercase>false</lowercase>
 </com.yahoo.glimmer.indexing.preprocessor.PredicatePrefixTupleFilter>

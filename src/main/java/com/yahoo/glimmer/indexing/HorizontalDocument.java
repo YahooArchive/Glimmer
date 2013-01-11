@@ -103,15 +103,19 @@ class HorizontalDocument extends RDFDocument {
 		continue;
 	    }
 	    
-	    String predicateId = factory.lookupResource(predicate, false);
+	    if (predicate.equals(RDF.TYPE.toString())) {
+		factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
+	    }
+	    
+	    String predicateId = factory.lookupResource(predicate, true);
 	    if (predicateId == null) {
 		throw new IllegalStateException("Predicate " + predicate + " not in resources hash function!");
 	    }
 
 	    String contextId = NO_CONTEXT;
 	    if (factory.isWithContexts() && relation.getContext() != null) {
-		if (relation.getContext() instanceof Resource) {
-		    contextId = factory.lookupResource(relation.getContext().toString(), false);
+		if (relation.getContext() instanceof Resource || relation.getContext() instanceof BNode) {
+		    contextId = factory.lookupResource(relation.getContext().toString(), true);
 		    if (contextId == null) {
 			throw new IllegalStateException("Context " + relation.getContext() + " not in resources hash function!");
 		    }
@@ -120,21 +124,8 @@ class HorizontalDocument extends RDFDocument {
 		}
 	    }
 
-	    if (relation.getObject() instanceof Resource) {
-		if (predicate.equals(RDF.TYPE.toString())) {
-		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-		    objects.add(relation.getObject().toString());
-		} else {
-		    String objectId = factory.lookupResource(relation.getObject().toString(), true);
-		    if (objectId == null) {
-			throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
-		    }
-		    objects.add(objectId);
-		}
-		predicates.add(predicateId);
-		contexts.add(contextId);
-	    } else if (relation.getObject() instanceof BNode) {
-		String objectId = factory.lookupResource(relation.getObject().toString(), false);
+	    if (relation.getObject() instanceof Resource || relation.getObject() instanceof BNode) {
+		String objectId = factory.lookupResource(relation.getObject().toString(), true);
 		if (objectId == null) {
 		    throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
 		}

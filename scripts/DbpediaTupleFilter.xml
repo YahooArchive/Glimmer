@@ -1,5 +1,5 @@
 <com.yahoo.glimmer.indexing.preprocessor.PredicatePrefixTupleFilter>
-	<urlPrefix>http://dbpedia.org/</urlPrefix>
+	<predicatePrefix>http://dbpedia.org/</predicatePrefix>
 	<filterNonMatches>false</filterNonMatches>
 	<lowercase>true</lowercase>
 </com.yahoo.glimmer.indexing.preprocessor.PredicatePrefixTupleFilter>
