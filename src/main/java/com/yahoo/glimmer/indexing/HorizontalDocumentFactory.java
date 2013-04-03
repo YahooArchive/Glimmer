@@ -15,7 +15,7 @@ import org.apache.hadoop.conf.Configuration;
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
     public static void setupConf(Configuration conf, boolean withContext, String resourcesHash, String hashValuePrefix) {
-	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, hashValuePrefix, "object", "predicate", "context", "subject");
+	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, hashValuePrefix, "subject", "subjectText", "object", "predicate", "context");
     }
 
     @Override

@@ -28,8 +28,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class BySubjectRecordTest {
-    private static final int ID_1 = 33;
-    private static final int PREVIOUS_ID_1 = 5;
+    private static final long ID_1 = 33;
+    private static final long PREVIOUS_ID_1 = Integer.MAX_VALUE + 5l;
     private static final String SUBJECT_1 = "http://subject/";
     private static final String RELATION_1_1 = "<http://predicate1> \"literal\" .";
     private static final String RELATION_1_2 = "<http://predicate2> <http://resource> .";

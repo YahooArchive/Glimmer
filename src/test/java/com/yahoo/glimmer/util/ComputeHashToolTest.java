@@ -13,13 +13,16 @@ package com.yahoo.glimmer.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
+import it.unimi.dsi.big.util.LongBigListSignedStringMap;
+import it.unimi.dsi.fastutil.longs.LongBigList;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
+import it.unimi.dsi.sux4j.mph.HollowTrieMonotoneMinimalPerfectHashFunction;
+import it.unimi.dsi.util.ByteBufferLongBigList;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
@@ -42,7 +45,7 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ComputeHashTest {
+public class ComputeHashToolTest {
     private static final String SOME_LINES = "a\nb\ncc\nd\n";
 
     private Mockery context;
@@ -108,7 +111,7 @@ public class ComputeHashTest {
 	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
 	
-	long hashSize = computeMph.buildHash(fs, "filename", 0, true, true, Charset.forName("UTF-8"), false);
+	long hashSize = computeMph.buildHash(fs, "filename", null, true, false, Charset.forName("UTF-8"), false);
 
 	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
@@ -118,9 +121,9 @@ public class ComputeHashTest {
 	// unmarshal the hash and check the values..
 	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(unsignedStream.toByteArray()));
 	Object readObject = ois.readObject();
-	assertTrue(readObject instanceof LcpMonotoneMinimalPerfectHashFunction);
+	assertTrue(readObject instanceof HollowTrieMonotoneMinimalPerfectHashFunction);
 	@SuppressWarnings("unchecked")
-	LcpMonotoneMinimalPerfectHashFunction<MutableString> mph = (LcpMonotoneMinimalPerfectHashFunction<MutableString>) readObject;
+	HollowTrieMonotoneMinimalPerfectHashFunction<MutableString> mph = (HollowTrieMonotoneMinimalPerfectHashFunction<MutableString>) readObject;
 
 	assertEquals(0, mph.getLong("a"));
 	assertEquals(1, mph.getLong("b"));
@@ -129,50 +132,50 @@ public class ComputeHashTest {
     }
 
     @Test
-    public void signedTest() throws IOException, ClassNotFoundException {
-	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
-	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
-	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
-	context.checking(expectations);
-	long hashSize = computeMph.buildHash(fs, "filename", 32, true, false, Charset.forName("UTF-8"), true);
-
-	assertEquals(4, hashSize);
-	context.assertIsSatisfied();
-
-	assertEquals("size\t4\nsignedWidth\t32\n", infoStream.toString());
-
-	// unmarshal the hash and check the values..
-	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(signedStream.toByteArray()));
-	Object readObject = ois.readObject();
-	assertTrue(readObject instanceof ShiftAddXorSignedStringMap);
-	ShiftAddXorSignedStringMap map = (ShiftAddXorSignedStringMap) readObject;
-
-	assertEquals(-1, map.getLong("0"));
-	assertEquals(0, map.getLong("a"));
-	assertEquals(-1, map.getLong("aa"));
-	assertEquals(1, map.getLong("b"));
-	assertEquals(-1, map.getLong("bb"));
-	assertEquals(2, map.getLong("cc"));
-	assertEquals(-1, map.getLong("ca"));
-	assertEquals(3, map.getLong("d"));
-	assertEquals(-1, map.getLong("dx"));
-    }
-    
-    @Test
     public void signedAndUnsignedTest() throws IOException, ClassNotFoundException {
 	expectations.oneOf(fs).create(expectations.with(unsignedPath), expectations.with(true));
-	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("outStats"))));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("unsignedOutStats"))));
 	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
+	
 	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
-	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("signedOutStats"))));
 	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
-	long hashSize = computeMph.buildHash(fs, "filename", 16, true, true, Charset.forName("UTF-8"), true);
+	long hashSize = computeMph.buildHash(fs, "filename", null, true, true, Charset.forName("UTF-8"), true);
 
 	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
 
-	assertTrue(infoStream.toString().matches("^size\t4\nunsignedBits\t3\\d\\d\nsignedWidth\t16\n$"));
+	assertEquals("size\t4\nunsignedBits\t728\nsignedWidth\t64\n", infoStream.toString());
+
+	// unmarshal the hash and check the values..
+	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(unsignedStream.toByteArray()));
+	Object readObject = ois.readObject();
+	assertTrue(readObject instanceof HollowTrieMonotoneMinimalPerfectHashFunction);
+	@SuppressWarnings("unchecked")
+	HollowTrieMonotoneMinimalPerfectHashFunction<MutableString> unsignedMap = (HollowTrieMonotoneMinimalPerfectHashFunction<MutableString>) readObject;
+	
+	ByteBuffer signedByteBuffer = ByteBuffer.wrap(signedStream.toByteArray());
+	LongBigList signatures = new MyByteBufferLongBigList(signedByteBuffer);
+	
+	LongBigListSignedStringMap signedMap = new LongBigListSignedStringMap(unsignedMap, signatures);
+	
+	assertEquals(-1, signedMap.getLong("0"));
+	assertEquals(0, signedMap.getLong("a"));
+	assertEquals(-1, signedMap.getLong("aa"));
+	assertEquals(1, signedMap.getLong("b"));
+	assertEquals(-1, signedMap.getLong("bb"));
+	assertEquals(2, signedMap.getLong("cc"));
+	assertEquals(-1, signedMap.getLong("ca"));
+	assertEquals(3, signedMap.getLong("d"));
+	assertEquals(-1, signedMap.getLong("dx"));
+    }
+    
+    // TODO.  This is just because of an error in the constructor of ByteBufferLongBigList.  Should be removed with the next version of dsiutils. (2.0.14)
+    private class MyByteBufferLongBigList extends ByteBufferLongBigList {
+	public MyByteBufferLongBigList(final ByteBuffer byteBuffer) {
+	    super( new ByteBuffer[] { byteBuffer }, byteBuffer.capacity() / 8, new boolean[ 1 ] );
+	}
     }
     
     private class PathMatcher extends BaseMatcher<Path> {

@@ -12,9 +12,9 @@ package com.yahoo.glimmer.indexing;
  */
 
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.index.DowncaseTermProcessor;
-import it.unimi.di.mg4j.index.TermProcessor;
-import it.unimi.di.mg4j.index.snowball.PorterStemmer;
+import it.unimi.di.big.mg4j.index.DowncaseTermProcessor;
+import it.unimi.di.big.mg4j.index.TermProcessor;
+import it.unimi.di.big.mg4j.index.snowball.PorterStemmer;
 
 /**
  * A term processor that combines other term processors.

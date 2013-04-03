@@ -33,10 +33,10 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     private OutputCount outputCount = new OutputCount();
     private BySubjectRecord bySubjectRecord = new BySubjectRecord();
     // Given that there is only 1 reducer writing a sorted list of subjects we
-    // can add the deduce the document ID and add it to bysubjects
+    // can use the order of docs to deduce the document ID and add it to bysubjects
     // The alternative would be to generate a MPH over the list of subjects but
     // that would require more memory when building the indices.
-    private int docId;
+    private long docId;
     
     static enum Counters {
 	TOO_MANY_RELATIONS;

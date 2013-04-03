@@ -11,20 +11,20 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.di.big.mg4j.index.Index;
+import it.unimi.di.big.mg4j.search.DocumentIterator;
+import it.unimi.di.big.mg4j.search.score.AbstractWeightedScorer;
+import it.unimi.di.big.mg4j.search.score.BM25FScorer;
+import it.unimi.di.big.mg4j.search.score.DelegatingScorer;
+import it.unimi.di.big.mg4j.search.visitor.CounterCollectionVisitor;
+import it.unimi.di.big.mg4j.search.visitor.CounterSetupVisitor;
+import it.unimi.di.big.mg4j.search.visitor.TermCollectionVisitor;
+import it.unimi.dsi.big.util.StringMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrays;
-import it.unimi.dsi.fastutil.ints.IntList;
-import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.ints.IntBigList;
+import it.unimi.dsi.fastutil.longs.LongBigList;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
-import it.unimi.di.mg4j.index.Index;
-import it.unimi.di.mg4j.search.DocumentIterator;
-import it.unimi.di.mg4j.search.score.AbstractWeightedScorer;
-import it.unimi.di.mg4j.search.score.BM25FScorer;
-import it.unimi.di.mg4j.search.score.DelegatingScorer;
-import it.unimi.di.mg4j.search.visitor.CounterCollectionVisitor;
-import it.unimi.di.mg4j.search.visitor.CounterSetupVisitor;
-import it.unimi.di.mg4j.search.visitor.TermCollectionVisitor;
-import it.unimi.dsi.util.StringMap;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -80,7 +80,7 @@ public class WOOScorer extends AbstractWeightedScorer implements DelegatingScore
      * The list of virtual frequencies (possibly approximated using just the
      * frequencies of the main field).
      */
-    private final LongList frequencies;
+    private final LongBigList frequencies;
     /**
      * An array indexed by offsets mapping each offset to the corresponding
      * index number.
@@ -113,7 +113,7 @@ public class WOOScorer extends AbstractWeightedScorer implements DelegatingScore
     private Object2DoubleMap<String> bByName;
 
     private double w_numberOfFieldsMatched;
-    private IntList defaultSizes;
+    private IntBigList defaultSizes;
     private double averageDocLength;
     private double[] documentWeights;
     private final double dl_cutoff;
@@ -131,8 +131,8 @@ public class WOOScorer extends AbstractWeightedScorer implements DelegatingScore
      *            number of documents
      * @param w_numberOfFieldsMatched
      */
-    public WOOScorer(final double k1, final Reference2DoubleMap<Index> b, final StringMap<? extends CharSequence> termMap, final LongList frequencies,
-	    final IntList defaultSizes, double averageDocLength, long N, double w_numberOfFieldsMatched, double[] documentWeights, double dl_cutoff,
+    public WOOScorer(final double k1, final Reference2DoubleMap<Index> b, final StringMap<? extends CharSequence> termMap, final LongBigList frequencies,
+	    final IntBigList defaultSizes, double averageDocLength, long N, double w_numberOfFieldsMatched, double[] documentWeights, double dl_cutoff,
 	    HashMap<Integer, Integer> documentPriors, int max_number_of_fields) {
 	this.termMap = termMap;
 	termVisitor = new TermCollectionVisitor();
@@ -164,7 +164,7 @@ public class WOOScorer extends AbstractWeightedScorer implements DelegatingScore
 	setupVisitor.clear();
 	documentIterator.acceptOnTruePaths(counterCollectionVisitor);
 
-	final int document = documentIterator.document();
+	final long document = documentIterator.document();
 	final int[] count = setupVisitor.count;
 	final double[] offset2Weight = this.offset2Weight;
 	final int[] offset2TermId = this.offset2TermId;

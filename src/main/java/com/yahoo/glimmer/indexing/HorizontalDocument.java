@@ -51,8 +51,11 @@ class HorizontalDocument extends RDFDocument {
     // Contexts are the hash values.
     private List<String> contexts = new ArrayList<String>();
 
+    // hash value of subject.
+    private List<String> subject = new ArrayList<String>();
+    
     // subjectTokens are tokens extracted from the subject Resource/BNode
-    private List<String> subjectTokens = new ArrayList<String>();
+    private List<String> subjectText = new ArrayList<String>();
 
     protected HorizontalDocument(HorizontalDocumentFactory factory) {
 	super(factory);
@@ -64,15 +67,25 @@ class HorizontalDocument extends RDFDocument {
     }
 
     protected void ensureParsed_(Iterator<Relation> relations) throws IOException {
+	subject.clear();
+	subjectText.clear();
 	objects.clear();
 	predicates.clear();
 	contexts.clear();
-	subjectTokens.clear();
+	
+	FastBufferedReader fbr;
+	MutableString word = new MutableString();
+	MutableString nonWord = new MutableString();
 
+	String subjectId = factory.getResourceIdPrefix() + Long.toString(getId());
+	subject.add(subjectId);
+	
+	// Add the subjectId also as text.
+	subjectText.add(subjectId);
 	// Index subject tokens
 	// We index the BNode id. Do we need it?
 	String subject = getSubject();
-	FastBufferedReader fbr;
+	
 	// remove http/https or _:
 	int startAt = subject.indexOf(':');
 	
@@ -82,17 +95,17 @@ class HorizontalDocument extends RDFDocument {
 	    startAt++;
 	    fbr = new FastBufferedReader(subject.toCharArray(), startAt, subject.length() - startAt);
 	}
-	MutableString word = new MutableString();
-	MutableString nonWord = new MutableString();
+	
 	while (fbr.next(word, nonWord)) {
 	    if (word != null && !word.equals("")) {
 		if (CombinedTermProcessor.getInstance().processTerm(word)) {
-		    subjectTokens.add(word.toString().toLowerCase());
+		    subjectText.add(word.toString().toLowerCase());
 		}
 	    }
 	}
 	fbr.close();
-
+	
+	// Predicate/object/context are parallel.
 	while (relations.hasNext()) {
 	    Relation relation = relations.next();
 	    String predicate = relation.getPredicate().toString();
@@ -147,7 +160,6 @@ class HorizontalDocument extends RDFDocument {
 			    predicates.add(predicateId);
 			    contexts.add(contextId);
 			}
-
 		    }
 		}
 		fbr.close();
@@ -163,13 +175,15 @@ class HorizontalDocument extends RDFDocument {
 	ensureParsed();
 	switch (field) {
 	case 0:
-	    return new WordArrayReader(objects);
+	    return new WordArrayReader(subject);
 	case 1:
-	    return new WordArrayReader(predicates);
+	    return new WordArrayReader(subjectText);
 	case 2:
-	    return new WordArrayReader(contexts);
+	    return new WordArrayReader(objects);
 	case 3:
-	    return new WordArrayReader(subjectTokens);
+	    return new WordArrayReader(predicates);
+	case 4:
+	    return new WordArrayReader(contexts);
 	default:
 	    throw new IllegalArgumentException();
 	}

@@ -78,6 +78,8 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	if (filter != null) {
 	    LOG.info("Using TupleFilter:\n" + filter.toString());
 	    setFilter(filter);
+	} else {
+	    LOG.info("No TupleFilter given. Processing all tuples.");
 	}
     };
 
@@ -208,7 +210,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    System.out.println("Long tuple. Length:" + predicateObjectContextDot.length() + " starting with " + predicateObjectContextDot.substring(0, 100));
 	    context.getCounter(Counters.LONG_TUPLES).increment(1);
 	} else {
-	    // Write subject with object, predicate, object, context as value
+	    // Write subject with predicate, object, context as value
 	    context.write(subject, new Text(predicateObjectContextDot.toString()));
 	}
     }

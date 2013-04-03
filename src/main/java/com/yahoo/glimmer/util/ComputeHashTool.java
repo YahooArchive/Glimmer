@@ -11,25 +11,29 @@ package com.yahoo.glimmer.util;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
+import it.unimi.dsi.big.util.LongBigListSignedStringMap;
 import it.unimi.dsi.bits.TransformationStrategies;
+import it.unimi.dsi.fastutil.Size64;
+import it.unimi.dsi.fastutil.io.FastBufferedOutputStream;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.SafelyCloseable;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
+import it.unimi.dsi.sux4j.mph.AbstractHashFunction;
+import it.unimi.dsi.sux4j.mph.HollowTrieMonotoneMinimalPerfectHashFunction;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.SequenceInputStream;
 import java.nio.charset.Charset;
 import java.util.AbstractCollection;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -54,7 +58,6 @@ import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.martiansoftware.jsap.stringparsers.ForNameStringParser;
-import com.martiansoftware.jsap.stringparsers.IntegerStringParser;
 
 public class ComputeHashTool extends Configured implements Tool {
     private final static Logger LOGGER = Logger.getLogger(ComputeHashTool.class);
@@ -62,7 +65,7 @@ public class ComputeHashTool extends Configured implements Tool {
     private static final String SIGNED_ARG = "signed";
     private static final String UNSIGNED_ARG = "unsigned";
     private static final String WRITE_INFO_ARG = "info";
-    private static final String SIGNATURE_WIDTH_ARG = "signatureWidth";
+    private static final String NUMBER_OF_ELEMENTS_ARG = "numElements";
     private static final String FILE_ENCODING_ARG = "encoding";
     public static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
     private static final String DOT_UNSIGNED = ".map";
@@ -72,12 +75,12 @@ public class ComputeHashTool extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
 	final SimpleJSAP jsap = new SimpleJSAP(ComputeHashTool.class.getName(), "Builds a hash function.", new Parameter[] {
-		new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Generate signed hashes."),
-		new Switch(UNSIGNED_ARG, 'u', UNSIGNED_ARG, "Generate unsiged hashes."),
-		new Switch(WRITE_INFO_ARG, 'i', WRITE_INFO_ARG, "Write a .info tab seperated text file with size/width info in."),
-		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser(), "32", JSAP.NOT_REQUIRED, 'w', "width",
-			"Sign the hash with a hash width of w bits."),
-		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class), "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding",
+		new Switch(SIGNED_ARG, SIGNED_ARG.charAt(0), SIGNED_ARG, "Generate signed hashes."),
+		new Switch(UNSIGNED_ARG, UNSIGNED_ARG.charAt(0), UNSIGNED_ARG, "Generate unsiged hashes."),
+		new Switch(WRITE_INFO_ARG, WRITE_INFO_ARG.charAt(0), WRITE_INFO_ARG, "Write a .info tab seperated text file with size/width info in."),
+		new FlaggedOption(NUMBER_OF_ELEMENTS_ARG, JSAP.LONG_PARSER, null, JSAP.NOT_REQUIRED, NUMBER_OF_ELEMENTS_ARG.charAt(0), NUMBER_OF_ELEMENTS_ARG,
+				"Sign the hash with a hash width of w bits."),
+		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class), "UTF-8", JSAP.NOT_REQUIRED, FILE_ENCODING_ARG.charAt(0), FILE_ENCODING_ARG,
 			"Set the input file encoding(default is UTF-8)."),
 		new UnflaggedOption(SRC_FILES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, JSAP.GREEDY,
 			"The filenames (or HDFS dirs if building hashes) to work with.") });
@@ -88,17 +91,22 @@ public class ComputeHashTool extends Configured implements Tool {
 	}
 
 	String[] srcFilenames = jsapResult.getStringArray(SRC_FILES_ARG);
-	Charset srcFileCharset = (Charset) jsapResult.getObject(FILE_ENCODING_ARG);
-	int signatureWidth = 0;
+	
+	Long numElements = null;
+	if (jsapResult.contains(NUMBER_OF_ELEMENTS_ARG)) {
+	    numElements = jsapResult.getLong(NUMBER_OF_ELEMENTS_ARG);
+	}
+	
 	boolean generateUnsigned = true;
+	boolean generateSigned = false;
+	Charset srcFileCharset = (Charset) jsapResult.getObject(FILE_ENCODING_ARG);
 	if (jsapResult.getBoolean(SIGNED_ARG)) {
-	    signatureWidth = jsapResult.getInt(SIGNATURE_WIDTH_ARG);
-
+	    generateSigned = true;
 	    if (jsapResult.getBoolean(UNSIGNED_ARG)) {
-		LOGGER.info("Building unsigned and signed hashes with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName()
+		LOGGER.info("Building unsigned and signed hashes for " + srcFileCharset.displayName()
 			+ " files:" + Arrays.toString(srcFilenames));
 	    } else {
-		LOGGER.info("Building signed hashes with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName() + " files:"
+		LOGGER.info("Building signed hashes for " + srcFileCharset.displayName() + " files:"
 			+ Arrays.toString(srcFilenames));
 		generateUnsigned = false;
 	    }
@@ -106,17 +114,18 @@ public class ComputeHashTool extends Configured implements Tool {
 	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
 	}
 	Configuration conf = getConf();
+	// This need to be set if you want to read from a local HDFS system.
 	//conf.set("fs.default.name","hdfs://127.0.0.1:9000/");
 	JobConf job = new JobConf(conf, ComputeHashTool.class);
 	FileSystem fs = FileSystem.get(job);
 	for (String srcFilename : srcFilenames) {
 	    LOGGER.info("Building hash of " + srcFilename);
-	    buildHash(fs, srcFilename, signatureWidth, generateUnsigned, true, srcFileCharset, jsapResult.getBoolean(WRITE_INFO_ARG, false));
+	    buildHash(fs, srcFilename, numElements, generateUnsigned, generateSigned, srcFileCharset, jsapResult.getBoolean(WRITE_INFO_ARG, false));
 	}
 	return 0;
     }
 
-    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean generateUnsigned, boolean keepUnsigned, final Charset charset, boolean writeInfoFile)
+    public long buildHash(FileSystem fs, String srcFilename, Long numElements, boolean generateUnsigned, boolean generateSigned, final Charset charset, boolean writeInfoFile)
 	    throws IOException, ClassNotFoundException {
 	final MapReducePartInputStreamEnumeration inputStreamEnumeration;
 	try {
@@ -125,7 +134,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    throw new RuntimeException("Failed to open " + srcFilename, e);
 	}
 
-	Collection<MutableString> inCollection = new LineReaderCollection(new LineReaderCollection.ReaderFactory() {
+	LineReaderCollection inCollection = new LineReaderCollection(new LineReaderCollection.ReaderFactory() {
 	    @Override
 	    public Reader newReader() {
 		inputStreamEnumeration.reset();
@@ -136,25 +145,41 @@ public class ComputeHashTool extends Configured implements Tool {
 	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
 	Path unsigendPath = new Path(destFilename + DOT_UNSIGNED);
 
-	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
+	HollowTrieMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
 	if (generateUnsigned) {
-	    LOGGER.info("\tBuilding unsigned hash...");
-	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
-	    if (signatureWidth <= 0 || keepUnsigned) {
-		LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
-		writeMapToFile(unsignedHash, fs, unsigendPath);
-	    }
+//	    if (numElements != null) {
+//		LOGGER.info("\tBuilding unsigned hash with given number of elements:" + numElements);
+//	    } else {
+//		LOGGER.info("\tBuilding unsigned hash. Getting number of elements from collection...");
+//		long timeToGetSize = System.currentTimeMillis();
+//		numElements = inCollection.size64();
+//		timeToGetSize = System.currentTimeMillis() - timeToGetSize;
+//		LOGGER.info("\tNumber of elements is " + numElements + " found in " + timeToGetSize / 1000 + " seconds");
+//	    }
+//	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, numElements, TransformationStrategies.prefixFreeUtf16());
+	    unsignedHash = new HollowTrieMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
+	    LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
+	    writeMapToFile(unsignedHash, fs, unsigendPath);
 	} else {
 	    LOGGER.info("\tLoading unsigned hash from " + unsigendPath.toString());
-	    unsignedHash = readMpHashFromFile(fs, unsigendPath);
+	    unsignedHash = (HollowTrieMonotoneMinimalPerfectHashFunction<CharSequence>)readMpHashFromFile(fs, unsigendPath);
 	}
 
-	if (signatureWidth > 0) {
+	if (generateSigned) {
 	    LOGGER.info("\tBuilding signed hash...");
-	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
+//	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
 	    Path signedPath = new Path(destFilename + DOT_SIGNED);
+	    DataOutputStream signedDataOutputStream = null;
+	    try {
+		signedDataOutputStream  = new DataOutputStream( new FastBufferedOutputStream(createOutputStream(fs, signedPath)));
+		LongBigListSignedStringMap.sign(inCollection.iterator(), signedDataOutputStream, null);
+	    } finally {
+		if (signedDataOutputStream != null) {
+		    signedDataOutputStream.close();
+		}
+	    }
+		
 	    LOGGER.info("\tSaving signed hash as " + signedPath.toString());
-	    writeMapToFile(signedHash, fs, signedPath);
 	}
 
 	if (writeInfoFile) {
@@ -165,15 +190,11 @@ public class ComputeHashTool extends Configured implements Tool {
 	    infoWriter.write("size\t");
 	    infoWriter.write(Long.toString(unsignedHash.size64()));
 	    infoWriter.write("\n");
-	    if (keepUnsigned) {
-		infoWriter.write("unsignedBits\t");
-		infoWriter.write(Long.toString((unsignedHash).numBits()));
-		infoWriter.write("\n");
-	    }
-	    if (signatureWidth > 0) {
-		infoWriter.write("signedWidth\t");
-		infoWriter.write(Integer.toString(signatureWidth));
-		infoWriter.write("\n");
+	    infoWriter.write("unsignedBits\t");
+	    infoWriter.write(Long.toString((unsignedHash).numBits()));
+	    infoWriter.write("\n");
+	    if (generateSigned) {
+		infoWriter.write("signedWidth\t64\n");
 	    }
 	    infoWriter.close();
 	    infoStream.close();
@@ -182,12 +203,14 @@ public class ComputeHashTool extends Configured implements Tool {
 	return unsignedHash.size64();
     }
 
+    private static OutputStream createOutputStream(FileSystem fs, Path path) throws IOException {
+	FSDataOutputStream outStream = fs.create(path, true);// overwrite;
+	fs.setPermission(path, ALL_PERMISSIONS);
+	return outStream;
+    }
     private static void writeMapToFile(AbstractObject2LongFunction<CharSequence> object, FileSystem fs, Path path) throws IOException {
-	FSDataOutputStream outStream = null;
+	OutputStream outStream = createOutputStream(fs, path);
 	try {
-	    outStream = fs.create(path, true);// overwrite
-	    fs.setPermission(path, ALL_PERMISSIONS);
-	    
 	    ObjectOutputStream oOutStream = null;
 	    try {
 		oOutStream = new ObjectOutputStream(outStream);
@@ -205,7 +228,7 @@ public class ComputeHashTool extends Configured implements Tool {
     }
 
     @SuppressWarnings("unchecked")
-    private static LcpMonotoneMinimalPerfectHashFunction<CharSequence> readMpHashFromFile(FileSystem fs, Path path) throws IOException, ClassNotFoundException {
+    private static AbstractHashFunction<CharSequence> readMpHashFromFile(FileSystem fs, Path path) throws IOException, ClassNotFoundException {
 	FSDataInputStream inStream = null;
 	try {
 	    inStream = fs.open(path);
@@ -213,7 +236,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    try {
     	    	oInStream = new ObjectInputStream(inStream);
     	    	Object object = oInStream.readObject();
-    	    	return (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) object;
+    	    	return (AbstractHashFunction<CharSequence>) object;
 	    } finally {
 		if (oInStream != null) {
 		    oInStream.close();
@@ -245,9 +268,9 @@ public class ComputeHashTool extends Configured implements Tool {
      * @author tep
      * 
      */
-    private static class LineReaderCollection extends AbstractCollection<MutableString> {
+    private static class LineReaderCollection extends AbstractCollection<MutableString> implements Size64 {
 	private final ReaderFactory readerFactory;
-	private int size = -1;
+	private long size = -1;
 
 	public LineReaderCollection(ReaderFactory readerFactory) {
 	    this.readerFactory = readerFactory;
@@ -291,7 +314,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    public MutableString next() {
 		if (advance) {
 		    if (!hasNext()) {
-			throw new NoSuchElementException();
+			throw new NoSuchElementException("Size is " + size);
 		    }
 		}
 		current.replace(next);
@@ -322,9 +345,18 @@ public class ComputeHashTool extends Configured implements Tool {
 
 	@Override
 	public int size() {
-	    if (size == -1) {
+	    long size64 = size64();
+	    if (size64 > Integer.MAX_VALUE) {
+		throw new IndexOutOfBoundsException("LineReaderCollection.size() called on a instance with more than Integer.MAX_VALUE elements.  Use Size64.size64() instead.");
+	    }
+	    return (int)size64;
+	}
+	
+	@Override
+	public long size64() {
+	    if (size == -1l) {
 		LineReaderIterator i = iterator();
-		size = 0;
+		size = 0l;
 		while (i.hasNext()) {
 		    size++;
 		    i.next();

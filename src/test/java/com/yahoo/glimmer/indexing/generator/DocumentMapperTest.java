@@ -11,6 +11,7 @@ package com.yahoo.glimmer.indexing.generator;
  *  See accompanying LICENSE file.
  */
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import it.unimi.dsi.fastutil.chars.CharArraySet;
 import it.unimi.dsi.fastutil.chars.CharSet;
@@ -21,6 +22,7 @@ import java.util.Collections;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
@@ -38,8 +40,9 @@ import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class DocumentMapperTest {
     private static final CharSet DELIMITER = new CharArraySet(Collections.singleton(' '));
+    private static final Text DOC_TEXT = new Text("TheRecordAsText");
     private Mockery context;
-    private Mapper<LongWritable, RDFDocument, TermKey, TermValue>.Context mapperContext;
+    private Mapper<LongWritable, Text, TermKey, TermValue>.Context mapperContext;
     private Configuration mapperConf;
     private RDFDocument doc;
     private Counters counters;
@@ -52,6 +55,7 @@ public class DocumentMapperTest {
 	
 	mapperContext = context.mock(Context.class, "mapperContext");
 	mapperConf = new Configuration();
+	mapperConf.setEnum("IndexType", IndexType.HORIZONTAL);
 	doc = context.mock(RDFDocument.class, "doc");
 	counters = new Counters();
     }
@@ -64,10 +68,12 @@ public class DocumentMapperTest {
 	    allowing(mapperContext).getConfiguration();
 	    will(returnValue(mapperConf));
 	    
+	    one(doc).setContent(with(DOC_TEXT.getBytes()), with(DOC_TEXT.getLength()));
+	    
 	    allowing(doc).getSubject();
 	    will(returnValue("http://subject/"));
 	    allowing(doc).getId();
-	    will(returnValue(5));
+	    will(returnValue(5l));
 	    
 	    one(mapperContext).getCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS);
 	    will(returnValue(counters.findCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS)));
@@ -79,7 +85,13 @@ public class DocumentMapperTest {
 	
 	DocumentMapper mapper = new DocumentMapper();
 	mapper.setup(mapperContext);
-	mapper.map(null, doc, mapperContext);
+	
+	assertArrayEquals(new String[]{"fieldZero"}, mapper.getFields());
+	
+	assertEquals(IndexType.HORIZONTAL, mapper.getDoc().getIndexType());
+	mapper.setDoc(doc);
+	
+	mapper.map(null, DOC_TEXT, mapperContext);
 	
 	context.assertIsSatisfied();
     }
@@ -92,6 +104,8 @@ public class DocumentMapperTest {
 	    allowing(mapperContext).getConfiguration();
 	    will(returnValue(mapperConf));
 	    
+	    one(doc).setContent(with(DOC_TEXT.getBytes()), with(DOC_TEXT.getLength()));
+	    
 	    allowing(mapperContext).setStatus(with(any(String.class)));
 	    allowing(mapperContext).getCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS);
 	    will(returnValue(counters.findCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS)));
@@ -101,7 +115,7 @@ public class DocumentMapperTest {
 	    allowing(doc).getSubject();
 	    will(returnValue("http://subject/"));
 	    allowing(doc).getId();
-	    will(returnValue(10));
+	    will(returnValue(10l));
 	    
 	    allowing(doc).getIndexType();
 	    will(returnValue(IndexType.VERTICAL));
@@ -151,7 +165,13 @@ public class DocumentMapperTest {
 	
 	DocumentMapper mapper = new DocumentMapper();
 	mapper.setup(mapperContext);
-	mapper.map(null, doc, mapperContext);
+	
+	assertArrayEquals(new String[]{"fieldZero", "fieldOne", "fieldTwo"}, mapper.getFields());
+	
+	assertEquals(IndexType.HORIZONTAL, mapper.getDoc().getIndexType());
+	mapper.setDoc(doc);
+	
+	mapper.map(null, DOC_TEXT, mapperContext);
 	
 	context.assertIsSatisfied();
 	

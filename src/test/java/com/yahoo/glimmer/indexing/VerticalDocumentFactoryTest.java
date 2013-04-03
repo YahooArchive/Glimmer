@@ -54,6 +54,9 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertTrue(reader.next(word, nonWord));
 	assertEquals("@46", word.toString());
 	assertEquals("", nonWord.toString());
+	assertTrue(reader.next(word, nonWord));
+	assertEquals("@47", word.toString());
+	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
 
 	reader = (WordArrayReader) document.content(2);
@@ -67,6 +70,6 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 
 	context.assertIsSatisfied();
 
-	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

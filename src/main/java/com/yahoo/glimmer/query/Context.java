@@ -22,13 +22,15 @@ import java.util.Properties;
 public class Context extends Properties {
     private static final long serialVersionUID = 8416864704849882837L;
 
+    private static final String RESOURCES_ID_PREFIX_KEY = "resourceIdPrefix";
     private static final String ALL_RESOURCES_MAP_KEY = "allResorcesMap";
+    private static final String ALL_RESOURCES_SIGNATURE_KEY = "allResorcesSignature";
     private static final String ALL_RESOURCES_KEY = "allResorces";
 
     private static final String MULTIINDEX_DIR_PREFIX_KEY = "multiindex.dirprefix";
     private static final String MULTIINDEX_PATH_KEY = "multiindex.path";
 
-    private static final String COLLECTION_KEY = "collection";
+    private static final String COLLECTION_BASENAME_KEY = "bySubject";
     private static final String VERTICAL_DIR_KEY = "vertical.dir";
     private static final String HORIZONTAL_DIR_KEY = "horizontal.dir";
     private static final String TITLE_LIST_KEY = "title.list";
@@ -71,9 +73,17 @@ public class Context extends Properties {
 	}
 	super.load(fs);
     }
+    
+    public String getResourceIdPrefix() {
+	return getString(RESOURCES_ID_PREFIX_KEY, "@");
+    }
 
     public File getAllResourcesMapFile() {
-	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_MAP_KEY, "all.smap"));
+	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_MAP_KEY, "all.map"));
+    }
+    
+    public File getAllResourcesSignatureFile() {
+	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_SIGNATURE_KEY, "all.smap"));
     }
 
     public File getAllResourcesFile() {
@@ -84,8 +94,8 @@ public class Context extends Properties {
 	return getDouble(B_TAG, 0.75);
     }
 
-    public File getCollectionFile() {
-	return getKbRootRelativeFile(getProperty(COLLECTION_KEY, "collection"));
+    public File getCollectionBasenameFile() {
+	return getKbRootRelativeFile(getProperty(COLLECTION_BASENAME_KEY, "bySubject"));
     }
 
     public File getVerticalIndexDir() {

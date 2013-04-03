@@ -50,10 +50,10 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     }
 
     private Type type;
-    private int v1;
+    private long v1;
     private int v2;
 
-    public TermValue(Type type, int v1) {
+    public TermValue(Type type, long v1) {
 	if (type != Type.INDEX_ID) {
 	    throw new IllegalArgumentException("Type " + type + " is not value with 1 arg");
 	}
@@ -61,7 +61,7 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
 	this.v1 = v1;
     }
 
-    public TermValue(Type type, int v1, int v2) {
+    public TermValue(Type type, long v1, int v2) {
 	if (type != Type.DOC_STATS && type != Type.OCCURRENCE) {
 	    throw new IllegalArgumentException("Type " + type + " is not value with 2 args");
 	}
@@ -87,7 +87,7 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
 	return type;
     }
 
-    public int getV1() {
+    public long getV1() {
 	return v1;
     }
 
@@ -97,13 +97,13 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
 
     public void readFields(DataInput in) throws IOException {
 	type = Type.values()[in.readInt()];
-	v1 = in.readInt();
+	v1 = in.readLong();
 	v2 = in.readInt();
     }
 
     public void write(DataOutput out) throws IOException {
 	out.writeInt(type.ordinal());
-	out.writeInt(v1);
+	out.writeLong(v1);
 	out.writeInt(v2);
     }
 
@@ -120,7 +120,7 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     public int hashCode() {
 	int hash = 7;
 	hash = 31 * hash + type.hashCode();
-	hash = 31 * hash + v1;
+	hash = 31 * hash + (int)(v1 ^ (v1 >>> 32));
 	hash = 31 * hash + v2;
 	return hash;
     }
@@ -130,13 +130,15 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     }
 
     public int compareTo(TermValue that) {
-	int i = type.compareTo(that.type);
+	long i = type.compareTo(that.type);
 	if (i != 0) {
-	    i = v1 - that.v1;
-	    if (i != 0) {
-		i = v2 - that.v2;
-	    }
+	    return (int)i;
 	}
-	return i;
+	i = v1 - that.v1;
+	if (i != 0) {
+	    return i > 0 ? 1 : -1;
+	}
+	i = v2 - that.v2;
+	return (int)i;
     }
 }

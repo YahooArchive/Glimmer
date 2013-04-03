@@ -21,7 +21,6 @@
 				<exclude>tomcat:jasper-compiler</exclude>
 				<exclude>tomcat:jasper-runtime</exclude>
 				<exclude>org.codehaus.jackson:*</exclude>
-				<exclude>org.slf4j:*</exclude>
 			</excludes>
 		</dependencySet>
 	</dependencySets>

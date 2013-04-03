@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
-import it.unimi.di.mg4j.document.DocumentFactory.FieldType;
+import it.unimi.di.big.mg4j.document.DocumentFactory.FieldType;
 
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -35,14 +35,14 @@ public abstract class RDFDocumentFactory {
     private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
     private static final String CONF_INDEX_TYPE_KEY = "IndexType";
     private static final String CONF_WITH_CONTEXTS_KEY = "WithContexts";
-    private static final String CONF_HASH_VALUE_PREFIX_KEY = "HashValuePrefix";
+    private static final String CONF_RESOURCE_ID_PREFIX_KEY = "resourceIdPrefix";
     private static final String CONF_RESOURCES_HASH_KEY = "ResourcesFilename";
 
     private static final Collection<String> PREDICATE_BLACKLIST = Arrays.asList("stag", "tagspace", "ctag", "rel", "mm");
 
     private String[] fields;
     private AbstractObject2LongFunction<CharSequence> resourcesHashFunction;
-    private String hashValuePrefix = "";
+    private String resourceIdPrefix = "";
 
     // TODO How to read these?
     private Counters counters = new Counters();
@@ -66,13 +66,13 @@ public abstract class RDFDocumentFactory {
 
     public abstract RDFDocument getDocument();
 
-    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String hashValuePrefix, String... fields) {
+    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String resourceIdPrefix, String... fields) {
 	conf.setEnum(CONF_INDEX_TYPE_KEY, type);
 	conf.setBoolean(CONF_WITH_CONTEXTS_KEY, withContexts);
 	if (resourcesHash != null) {
 	    conf.set(CONF_RESOURCES_HASH_KEY, resourcesHash);
 	}
-	conf.set(CONF_HASH_VALUE_PREFIX_KEY, hashValuePrefix);
+	conf.set(CONF_RESOURCE_ID_PREFIX_KEY, resourceIdPrefix);
 	conf.setStrings(CONF_FIELDNAMES_KEY, fields);
     }
 
@@ -97,7 +97,7 @@ public abstract class RDFDocumentFactory {
     }
     
     public static String getHashValuePrefix(Configuration conf) {
-	return conf.get(CONF_HASH_VALUE_PREFIX_KEY, "");
+	return conf.get(CONF_RESOURCE_ID_PREFIX_KEY, "");
     }
 
     public static RDFDocumentFactory buildFactory(Configuration conf) {
@@ -112,7 +112,7 @@ public abstract class RDFDocumentFactory {
 	}
 	factory.setFields(getFieldsFromConf(conf));
 	factory.setWithContexts(getWithContexts(conf));
-	factory.setHashValuePrefix(getHashValuePrefix(conf));
+	factory.setResourceIdPrefix(getHashValuePrefix(conf));
 	String resourcesHashFilename = conf.get(CONF_RESOURCES_HASH_KEY);
 	if (resourcesHashFilename != null) {
 	    // Load the hash func.
@@ -137,40 +137,34 @@ public abstract class RDFDocumentFactory {
 	this.resourcesHashFunction = resourcesHashFunction;
     }
 
-    public String getHashValuePrefix() {
-	return hashValuePrefix;
+    public String getResourceIdPrefix() {
+	return resourceIdPrefix;
     }
 
-    public void setHashValuePrefix(String hashValuePrefix) {
-	this.hashValuePrefix = hashValuePrefix;
+    public void setResourceIdPrefix(String resourceIdPrefix) {
+	this.resourceIdPrefix = resourceIdPrefix;
     }
 
     /**
      * @param url
-     * @return The hash value for the given URL/BNode or null if the given
-     *         URL/BNode is not in the hash function. nulls will only be
-     *         returned when the hash function being used is signed. For
-     *         unsigned hash functions some value smaller than the size of the
-     *         hash will be returned.
+     * @return The hash value for the given URL/BNode or null. The exact behavior depends on the implementation of the hash function used.
+     *  
      */
-    public Integer lookupResource(String key) {
+    public Long lookupResource(String key) {
 	Long value = resourcesHashFunction.get(key);
-	if (value == null || value < 0) {
-	    return null;
+	if (value != null && value < 0) {
+	    throw new RuntimeException("Negative hash value for " + key);
 	}
-	if (value > Integer.MAX_VALUE) {
-	    throw new RuntimeException("Hash value bigger that max int.");
-	}
-	return value.intValue();
+	return value;
     }
 
     public String lookupResource(String key, boolean prefixed) {
-	Integer intValue = lookupResource(key);
-	if (intValue != null) {
+	Long value = lookupResource(key);
+	if (value != null) {
 	    if (prefixed) {
-		return hashValuePrefix + intValue.toString();
+		return resourceIdPrefix + value.toString();
 	    } else {
-		return intValue.toString();
+		return value.toString();
 	    }
 	}
 	return null;

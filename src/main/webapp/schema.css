@@ -13,8 +13,10 @@
 	width: 100%;
 	text-align: left;
 	margin: 0;
-	/* -- background: #fff; -- */
-	/* -- background-image: url("bg.gif"); -- */
+	min-height: 100%;
+	height: auto !important;
+	height: 100%;
+	margin: 0 auto -20px; 
 }
 
 #intro {
@@ -28,7 +30,7 @@
 }
 
 #topContent {
-	padding: 10px;
+	padding: 8px;
 	z-index: 2;
 	float: left;
 }
@@ -51,16 +53,12 @@
 	float: left;
 }
 
-#footer {
-	max-width: 960px;
-	min-width: 350px;
-	margin: 0 auto;
-	padding: 0 40px;
-}
-
-#footer {
+#footer, #footer-push {
+	padding: 0 10px;
+	height: 20px;
 	text-align: right;
 	font-size: x-small;
+	clear:both;
 }
 
 #pageHeader h1 {
@@ -154,7 +152,6 @@
 .doc-link {
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 	margin-left: 10px;
 }
 
@@ -184,13 +181,11 @@
 #mainContent a:link { /*color: #5555FF*/;
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 }
 
 #mainContent a:visited {
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #3399FF;
 }
 
 #mainContent a:hover {
@@ -205,7 +200,46 @@
 	margin: 10px 0 10px 15px;
 	width: auto;
 	float: right;
-	border-left: thin dotted #000;
+}
+
+#statistics-loader {
+	padding: 6px;
+}
+
+.status {
+	clear:both;
+	text-align: center;
+	padding-right: 4px;
+	padding-left: 4px;
+}
+#result-stats {
+	float:left;
+}
+
+#results {
+	clear: both;
+}
+#results ol{
+	list-style: decimal inside;
+	margin-left: 1em;
+}
+
+.results-pager {
+}
+.results-pager .pager-link {
+	padding: 2px;
+}
+.results-pager .pager-link-current {
+	background-color: #E4F2FF;
+}
+#results-pager-top-status {
+	float: right;
+}
+#results-pager-top {
+	clear:both;
+	float:right;
+}
+#results-pager-bottom {
 }
 
 /* -- general -- */
@@ -218,6 +252,7 @@ body {
 	margin: 0;
 	padding: 0;
 	text-align: center;
+	height: 100%;
 }
 
 code {
@@ -311,13 +346,11 @@ ul li {
 a:link {
 	color: #5555FF;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 }
 
 a:visited {
 	color: #3399FF;
 	text-decoration: none;
-	border-bottom: dotted 1px #3399FF;
 }
 
 a:hover {
@@ -332,7 +365,6 @@ blockquote {
 	margin: 10px 0 10px 15px;
 	width: auto;
 	float: right;
-	border-left: thin dotted #000;
 }
 
 .object div {

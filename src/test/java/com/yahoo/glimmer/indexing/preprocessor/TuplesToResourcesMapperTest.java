@@ -63,9 +63,9 @@ public class TuplesToResourcesMapperTest {
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://www.example.org/staffid/85740> <http://www.example.org/terms/name> \"Smith\" ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(6l), new Text(
 		"<http://www.example.org/staffid/85741> <http://www.example.org/terms/name> \"Johnson\"@en ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(7l), new Text(
 		"<http://www.example.org/staffid/85742> <http://www.example.org/terms/name> \"Ray\"@ ."), mrContext);
 	context.assertIsSatisfied();
     }
@@ -190,15 +190,15 @@ public class TuplesToResourcesMapperTest {
 	// We should get the 2nd, 3rd and 5th tuple only.
 	mapper.setFilter(regexTupleFilter);
 	
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(15l), new Text(
 		"<http://s1> <http://p1> <http://s2> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(16l), new Text(
 		"<http://s1> <http://p2> <http://s3> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(17l), new Text(
 		"<http://s2> <http://p3> <http://s3> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(18l), new Text(
 		"<http://s2> <http://p4> \"o4\" <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(19l), new Text(
 		"<http://s3> <http://p5> \"o5\" <http://context/> ."), mrContext);
 	
 	context.assertIsSatisfied();
@@ -230,15 +230,15 @@ public class TuplesToResourcesMapperTest {
 	
 	mapper.setFilter(filter);
 	
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(25l), new Text(
 		"<http://s1> <http://p1> <http://s2> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(26l), new Text(
 		"<http://s1> <http://p2> <http://s3> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(27l), new Text(
 		"<http://s2> <http://p3> <http://s3> <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(28l), new Text(
 		"<http://s2> <http://p4> \"o4\" <http://context/> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(29l), new Text(
 		"<http://s3> <http://p5> \"o5\" <http://context/> ."), mrContext);
 	
 	context.assertIsSatisfied();
@@ -269,13 +269,13 @@ public class TuplesToResourcesMapperTest {
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://s1> <http://schema.org/p1> \"o1\" <http://context/1> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(6l), new Text(
 		"<http://s2> <http://schema.org/p2> \"o2\" <http://context/1> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(7l), new Text(
 		"<http://s2> <http://nothing.org/p3> \"o3\" <http://context/1> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(8l), new Text(
 		"<http://s3> <http://schema.org/p4> <http://o4> <http://context/2> ."), mrContext);
-	mapper.map(new LongWritable(5l), new Text(
+	mapper.map(new LongWritable(9l), new Text(
 		"<http://s3> <http://nothing.org/p5> <http://o5> <http://context/2> ."), mrContext);
 	
 	context.assertIsSatisfied();

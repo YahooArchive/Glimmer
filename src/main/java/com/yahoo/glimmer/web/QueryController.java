@@ -11,19 +11,23 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.query.parser.QueryParserException;
-import it.unimi.di.mg4j.query.parser.SimpleParser;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.query.parser.QueryParserException;
+import it.unimi.di.big.mg4j.query.parser.SimpleParser;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.apache.log4j.Logger;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,12 +42,21 @@ import com.yahoo.glimmer.query.RDFQueryResult;
 
 @Controller()
 public class QueryController {
-    private static final String DOC_PSEUDO_FIELD = "doc:";
+    private final static Logger LOGGER = Logger.getLogger(QueryController.class);
+    
     public final static String INDEX_KEY = "index";
     public final static String OBJECT_KEY = "object";
+    
+    private static final String DOC_PSEUDO_FIELD = "doc:";
+    // This defines how resources are written in the command objects query string.
+    private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+|_:[A-Za-z][A-Za-z0-9]*)>)");
+
+    private static final Integer DEFAULT_OBJECT_LENGTH_LIMIT = 300;
 
     private IndexMap indexMap;
     private Querier querier;
+    
+    private Integer defaultObjectLengthLimit = DEFAULT_OBJECT_LENGTH_LIMIT;
 
     // / For every request populate the dataset model attribute from the request
     // parameter.
@@ -66,7 +79,7 @@ public class QueryController {
     }
 
     @RequestMapping(value = "/indexStatistics", method = RequestMethod.GET)
-    public Map<String, ?> getIndextStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
+    public Map<String, ?> getIndexStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
 	if (index == null) {
 	    throw new HttpMessageConversionException("No index given");
 	}
@@ -82,29 +95,30 @@ public class QueryController {
 	    throw new HttpMessageConversionException("No index given");
 	}
 
-	String rawQuery = command.getQuery();
-	if (rawQuery == null || rawQuery.isEmpty()) {
+	String query = command.getQuery();
+	if (query == null || query.isEmpty()) {
 	    throw new HttpMessageConversionException("No query given");
 	}
 
-	Query query;
+	query = decodeEntities(command.getQuery()).trim();
+	query = encodeResources(index, query);
+	
+	Query parsedQuery;
 	RDFQueryResult result;
 	switch (command.getType()) {
 	case MG4J:
-	    rawQuery = decodeEntities(command.getQuery()).trim();
-	    query = new SimpleParser().parse(rawQuery);
-	    result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
+	    parsedQuery = new SimpleParser().parse(query);
+	    result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    break;
 	case YAHOO:
-	    rawQuery = decodeEntities(command.getQuery()).trim();
-	    if (rawQuery.startsWith(DOC_PSEUDO_FIELD)) {
-		String idOrSubject = rawQuery.substring(DOC_PSEUDO_FIELD.length());
-		Integer id;
+	    if (query.startsWith(DOC_PSEUDO_FIELD)) {
+		String idOrSubject = query.substring(DOC_PSEUDO_FIELD.length());
+		Long id;
 		if (Character.isDigit(idOrSubject.charAt(0))) {
 		    try {
-			id = Integer.parseInt(idOrSubject);
+			id = Long.parseLong(idOrSubject);
 		    } catch (NumberFormatException e) {
-			throw new IllegalArgumentException("Query " + rawQuery + " failed to parse as a numeric subject ID(int)");
+			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID(int)");
 		    }
 		} else {
 		    id = index.getSubjectId(idOrSubject);
@@ -112,14 +126,14 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref());
+		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
 	    } else {
 		try {
-		    query = index.getParser().parse(rawQuery);
+		    parsedQuery = index.getParser().parse(query);
 		} catch (QueryParserException e) {
-		    throw new IllegalArgumentException("Query failed to parse:" + rawQuery, e);
+		    throw new IllegalArgumentException("Query failed to parse:" + query, e);
 		}
-		result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
+		result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    }
 	    break;
 	default:
@@ -130,7 +144,8 @@ public class QueryController {
     }
 
     @ExceptionHandler(Exception.class)
-    public Map<String, ?> handleException(Exception ex, HttpServletResponse response) {
+    public Map<String, ?> handleException(Exception ex,  HttpServletRequest request, HttpServletResponse response) {
+	LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }
@@ -145,6 +160,33 @@ public class QueryController {
 	result = result.replaceAll("&#92;", "\\\\");
 	return result;
     }
+    
+    /**
+     * Replaces '<' + resource + '>' strings with '@' + resourceId.
+     * 
+     * @param index
+     * @param query
+     * @return re-written query.
+     * @throws IllegalArgumentException when a resource that is not in the data set is found in the given query.
+     */
+    public static String encodeResources(RDFIndex index, String query) {
+	Matcher resourceMatcher = RESOURCE_PATTERN.matcher(query);
+	StringBuffer sb = new StringBuffer();
+	while (resourceMatcher.find()) {
+	    String resource = resourceMatcher.group(0);
+	    // Remove < and >
+	    resource = resource.substring(1, resource.length() - 1);
+	    
+	    String resourceId = index.lookupIdByResourceId(resource);
+	    if (resourceId == null) {
+		throw new IllegalArgumentException("The resource " + resource + " isn't in the data set.");
+	    }
+	    resourceMatcher.appendReplacement(sb, resourceId);
+	 }
+	resourceMatcher.appendTail(sb);
+	
+	return sb.toString();
+    }
 
     @Resource
     public void setQuerier(Querier querier) {
@@ -155,4 +197,9 @@ public class QueryController {
     public void setIndexMap(IndexMap indexMap) {
 	this.indexMap = indexMap;
     }
+    
+    public void setDefaultObjectLengthLimit(Integer defaultObjectLengthLimit) {
+	this.defaultObjectLengthLimit = defaultObjectLengthLimit;
+    }
 }
+

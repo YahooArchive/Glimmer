@@ -18,15 +18,20 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
 import com.yahoo.glimmer.indexing.RDFDocument;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
-public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, TermValue> {
+public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValue> {
+    private static final Log LOG = LogFactory.getLog(DocumentMapper.class);
+    
     public static final int ALIGNMENT_INDEX = -1; // special index for
 						  // alignments
 
@@ -35,20 +40,28 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
     }
 
     private String[] fields;
+    private RDFDocument doc;
 
-    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermKey, TermValue>.Context context) throws IOException,
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, TermKey, TermValue>.Context context) throws IOException,
 	    InterruptedException {
 	Configuration conf = context.getConfiguration();
 	fields = RDFDocumentFactory.getFieldsFromConf(conf);
-    };
+	doc = RDFDocumentFactory.buildFactory(conf).getDocument();
+    }
 
     @Override
-    public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
+    public void map(LongWritable key, Text record, Context context) throws IOException, InterruptedException {
+	doc.setContent(record.getBytes(), record.getLength());
+	
 	if (doc == null || doc.getSubject() == null) {
 	    // Failed parsing
 	    context.getCounter(Counters.FAILED_PARSING).increment(1);
-	    System.out.println("Document failed parsing");
+	    LOG.error("Document failed parsing");
 	    return;
+	}
+	
+	if (doc.getId() < 0) {
+	    throw new IllegalStateException("Negative docId:" + doc.getId() + " subject:" + doc.getSubject());
 	}
 
 	// This is used to write the position of the last occurrence and testing
@@ -56,10 +69,10 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 	Map<String, DocStat> termToDocStatMap = new HashMap<String, DocStat>();
 
 	// Iterate over all indices
-	for (int i = 0; i < fields.length; i++) {
-	    TermValue indexIdValue = new TermValue(Type.INDEX_ID, i);
+	for (int indexId = 0; indexId < fields.length; indexId++) {
+	    TermValue indexIdValue = new TermValue(Type.INDEX_ID, indexId);
 
-	    String fieldName = fields[i];
+	    String fieldName = fields[indexId];
 	    if (fieldName.startsWith("NOINDEX")) {
 		continue;
 	    }
@@ -67,7 +80,7 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 	    // Iterate in parallel over the words of the indices
 	    MutableString term = new MutableString("");
 	    MutableString nonWord = new MutableString("");
-	    WordReader termReader = doc.content(i);
+	    WordReader termReader = doc.content(indexId);
 	    int position = 0;
 
 	    while (termReader.next(term, nonWord)) {
@@ -76,11 +89,11 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 		    String termString = term.toString();
 
 		    // Report progress
-		    context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
+		    context.setStatus(fields[indexId] + "=" + term.substring(0, Math.min(term.length(), 50)));
 
 		    // Create an occurrence at the next position
 		    TermValue occurrenceValue = new TermValue(Type.OCCURRENCE, doc.getId(), position);
-		    context.write(new TermKey(termString, i, occurrenceValue), occurrenceValue);
+		    context.write(new TermKey(termString, indexId, occurrenceValue), occurrenceValue);
 
 		    DocStat docStat = termToDocStatMap.get(termString);
 		    if (docStat == null) {
@@ -107,23 +120,37 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 		    position++;
 		    context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
 		} else {
-		    System.out.println("Nextterm is null");
+		    LOG.info("Nextterm is null");
 		}
 	    }
 
 	    for (String termString : termToDocStatMap.keySet()) {
 		DocStat docStat = termToDocStatMap.get(termString);
 		TermValue occurrenceCountValue = new TermValue(Type.DOC_STATS, docStat.count, docStat.last);
-		context.write(new TermKey(termString, i, occurrenceCountValue), occurrenceCountValue);
+		context.write(new TermKey(termString, indexId, occurrenceCountValue), occurrenceCountValue);
 	    }
 	    termToDocStatMap.clear();
 	}
 
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
     }
-
+    
     private static class DocStat {
 	int last;
 	int count;
+    }
+    
+    // For testing
+    String[] getFields() {
+	return fields;
+    }
+    void setFields(String[] fields) {
+	this.fields = fields;
+    }
+    RDFDocument getDoc() {
+	return doc;
+    }
+    void setDoc(RDFDocument doc) {
+	this.doc = doc;
     }
 }

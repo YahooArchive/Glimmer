@@ -12,10 +12,10 @@ package com.yahoo.glimmer.query;
  */
 
 import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.index.BitStreamIndex;
-import it.unimi.di.mg4j.index.Index;
+import it.unimi.di.big.mg4j.document.Document;
+import it.unimi.di.big.mg4j.document.DocumentCollection;
+import it.unimi.di.big.mg4j.index.BitStreamIndex;
+import it.unimi.di.big.mg4j.index.Index;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -63,7 +63,7 @@ public class SetDocumentPriors {
 	return rules;
     }
 
-    public static void calculatePriors(int numberOfDocuments, DocumentCollection collection, Map<String, Integer> hostToWeightMap, OutputStream documetPriorsOutputStream) {
+    public static void calculatePriors(long numberOfDocuments, DocumentCollection collection, Map<String, Integer> hostToWeightMap, OutputStream documetPriorsOutputStream) {
 	HashMap<Integer, Integer> priors = new HashMap<Integer, Integer>();
 	Document d;
 	try {

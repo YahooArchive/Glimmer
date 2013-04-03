@@ -51,6 +51,11 @@ public class TermKeyTest {
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 5, 67))) > 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 7, 67))) < 0);
 	
+	assertEquals(0, compare(new TermKey("a", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("a", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67))));
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 5l, 67))) > 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 7l, 67))) < 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6l, 67))) > 0);
+	
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67))) > 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))) > 0);
 	
@@ -118,5 +123,13 @@ public class TermKeyTest {
 	key2.readFields(dataInput);
 	
 	assertEquals(key1, key2);
+    }
+    
+    @Test
+    public void firstPartitionerTest() {
+	// The hashCode of "node178qbtfd0x20663837" is Integer.MIN_VALUE
+	TermKey termKey = new TermKey("node178qbtfd0x20663837", 1, new TermValue(TermValue.Type.OCCURRENCE, 1021424687, 1));
+	TermKey.FirstPartitioner partitioner = new TermKey.FirstPartitioner();
+	assertEquals(26, partitioner.getPartition(termKey, termKey.getValue(), 30));
     }
 }

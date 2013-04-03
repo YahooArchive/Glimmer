@@ -22,10 +22,10 @@ class TermKeyMatcher extends BaseMatcher<TermKey> {
     public TermKeyMatcher(int index, String term) {
         pair = new TermKey(term, index, null);
     }
-    public TermKeyMatcher(int index, String term, Type type, int v1) {
+    public TermKeyMatcher(int index, String term, Type type, long v1) {
 	pair = new TermKey(term, index, new TermValue(type, v1));
     }
-    public TermKeyMatcher(int index, String term, Type type, int v1, int v2) {
+    public TermKeyMatcher(int index, String term, Type type, long v1, int v2) {
 	pair = new TermKey(term, index, new TermValue(type, v1, v2));
     }
     

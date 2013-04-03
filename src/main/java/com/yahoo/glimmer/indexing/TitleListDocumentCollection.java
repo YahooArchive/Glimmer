@@ -11,24 +11,24 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.dsi.fastutil.BigList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.document.AbstractDocument;
-import it.unimi.di.mg4j.document.AbstractDocumentCollection;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.document.DocumentFactory;
-import it.unimi.di.mg4j.document.IdentityDocumentFactory;
-import it.unimi.di.mg4j.document.PropertyBasedDocumentFactory;
+import it.unimi.di.big.mg4j.document.AbstractDocument;
+import it.unimi.di.big.mg4j.document.AbstractDocumentCollection;
+import it.unimi.di.big.mg4j.document.Document;
+import it.unimi.di.big.mg4j.document.DocumentCollection;
+import it.unimi.di.big.mg4j.document.DocumentFactory;
+import it.unimi.di.big.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.big.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.util.Properties;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
-import java.util.List;
 
 import org.apache.commons.configuration.ConfigurationException;
 
@@ -40,7 +40,7 @@ import org.apache.commons.configuration.ConfigurationException;
  */
 public class TitleListDocumentCollection extends AbstractDocumentCollection {
 
-    public List<MutableString> titlelist;
+    public BigList<MutableString> titlelist;
     protected transient TitleListDocumentFactory factory = new TitleListDocumentFactory();
 
     public static class TitleListDocumentFactory extends IdentityDocumentFactory {
@@ -104,7 +104,7 @@ public class TitleListDocumentCollection extends AbstractDocumentCollection {
 
     }
 
-    public TitleListDocumentCollection(List<MutableString> titlelist) {
+    public TitleListDocumentCollection(BigList<MutableString> titlelist) {
 	this.titlelist = titlelist;
     }
 
@@ -114,7 +114,7 @@ public class TitleListDocumentCollection extends AbstractDocumentCollection {
     }
 
     @Override
-    public Document document(int index) throws IOException {
+    public Document document(long index) throws IOException {
 	Reference2ObjectMap<Enum<?>, Object> metadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.URI, titlelist.get(index));
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, titlelist.get(index));
@@ -122,17 +122,17 @@ public class TitleListDocumentCollection extends AbstractDocumentCollection {
     }
 
     @Override
-    public Reference2ObjectMap<Enum<?>, Object> metadata(int index) throws IOException {
+    public Reference2ObjectMap<Enum<?>, Object> metadata(long index) throws IOException {
 	throw new UnsupportedOperationException();
     }
 
     @Override
-    public int size() {
+    public long size() {
 	return titlelist.size();
     }
 
     @Override
-    public InputStream stream(int index) throws IOException {
+    public InputStream stream(long index) throws IOException {
 	throw new UnsupportedOperationException();
     }
 

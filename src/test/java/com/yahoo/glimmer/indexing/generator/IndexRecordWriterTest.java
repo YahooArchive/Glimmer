@@ -14,9 +14,9 @@ package com.yahoo.glimmer.indexing.generator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.IndexIterator;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
+import it.unimi.di.big.mg4j.index.BitStreamIndex;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.IndexIterator;
 
 import java.io.IOException;
 import java.net.URI;
@@ -57,7 +57,7 @@ public class IndexRecordWriterTest {
 	conf = new Configuration();
 	
 	conf.set("mapred.output.dir", INDEX_TMP_DIR.toString());
-	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
+	conf.setLong(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
 
 	fs.initialize(new URI("file:///"), new Configuration());
     }
@@ -197,7 +197,7 @@ public class IndexRecordWriterTest {
 	Path workPath = outputFormat.getDefaultWorkFile(taskContext,"");
 	System.out.println("Default work file is " + workPath.toString());
 	String dir = workPath.toUri().getPath();
-	QuasiSuccinctIndex index0 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index0", true);
+	BitStreamIndex index0 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index0", true);
 	assertEquals(8, index0.numberOfDocuments);
 	assertEquals(2, index0.numberOfTerms);
 	assertTrue(index0.hasPositions);
@@ -206,7 +206,7 @@ public class IndexRecordWriterTest {
 	// term2
 	checkOccurrences(index0.documents(1), 2, "(1:10,19) (7:13,16)");
 
-	QuasiSuccinctIndex index1 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index1", true);
+	BitStreamIndex index1 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index1", true);
 	assertEquals(8, index1.numberOfDocuments);
 	assertEquals(2, index1.numberOfTerms);
 	assertTrue(index0.hasPositions);
@@ -214,7 +214,7 @@ public class IndexRecordWriterTest {
 	// term3
 	checkOccurrences(index1.documents(1), 1, "(3:10,11)");
 	
-	QuasiSuccinctIndex indexAlignment = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/alignment", true);
+	BitStreamIndex indexAlignment = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/alignment", true);
 	assertEquals(8, indexAlignment.numberOfDocuments);
 	assertEquals(3, indexAlignment.numberOfTerms);
 	assertFalse(indexAlignment.hasPositions);
@@ -233,7 +233,7 @@ public class IndexRecordWriterTest {
 	    if (actual.length() > 0) {
 		actual.append(' ');
 	    }
-	    Integer next = documents.nextDocument();
+	    Long next = documents.nextDocument();
 	    actual.append('(');
 	    actual.append(next);
 	    actual.append(':');

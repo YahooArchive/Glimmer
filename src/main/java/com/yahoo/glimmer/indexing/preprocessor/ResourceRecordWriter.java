@@ -11,7 +11,6 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -30,7 +29,9 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
+import com.yahoo.glimmer.util.BlockOffsets;
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.glimmer.util.Bz2BlockIndexedOutputStream;
 
 /**
  * Writes to different output files depending on the contents of the value.
@@ -40,7 +41,7 @@ import com.yahoo.glimmer.util.BySubjectRecord;
  */
 public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     public static enum OUTPUT {
-	ALL("all", false), BY_SUBJECT("bySubject", false), CONTEXT("contexts", false), OBJECT("objects", false), PREDICATE("predicates", true), SUBJECT("subjects", false);
+	ALL("all", false), CONTEXT("contexts", false), OBJECT("objects", false), PREDICATE("predicates", true), SUBJECT("subjects", false);
 
 	final String filename;
 	final boolean includeCounts;
@@ -54,7 +55,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     public static class OutputCount {
 	public OUTPUT output;
 	public int count;
-	
+
 	@Override
 	public String toString() {
 	    return (output == null ? null : output.toString()) + "(" + count + ")";
@@ -62,6 +63,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     }
 
     private HashMap<OUTPUT, Writer> writersMap = new HashMap<OUTPUT, Writer>();
+    private OutputStream bySubjectOffsetsOutputStream;
+    private Writer bySubjectWriter;
+    private BlockOffsets.BlockOffsetsCallback blockOffsetsCallback;
+    private long recordCount = 0;
 
     public ResourceRecordWriter(FileSystem fs, Path taskWorkPath, CompressionCodec codecIfAny) throws IOException {
 	if (fs.exists(taskWorkPath)) {
@@ -79,8 +84,19 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 		Path file = new Path(taskWorkPath, output.filename);
 		out = fs.create(file, false);
 	    }
-	    writersMap.put(output, new BufferedWriter(new OutputStreamWriter(out, Charset.forName("UTF-8"))));
+	    writersMap.put(output, new OutputStreamWriter(out, Charset.forName("UTF-8")));
 	}
+
+	Path file = new Path(taskWorkPath, "bySubject.bz2");
+	OutputStream compressedOutputStream = fs.create(file, false);
+	file = new Path(taskWorkPath, "bySubject.blockOffsets");
+	bySubjectOffsetsOutputStream = fs.create(file, false);
+
+	blockOffsetsCallback = new BlockOffsets.BlockOffsetsCallback();
+	// Create a Writer on a BZip2 compressed OutputStream with a small block
+	// size( * 100K).
+	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(compressedOutputStream, 2, blockOffsetsCallback);
+	bySubjectWriter = new OutputStreamWriter(blockDataOut);
     }
 
     /**
@@ -93,7 +109,6 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
      */
     @Override
     public void write(Text key, Object value) throws IOException, InterruptedException {
-	String keyString = key.toString();
 
 	if (value instanceof OutputCount) {
 	    OutputCount outputCount = (OutputCount) value;
@@ -104,19 +119,24 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 		writer.write(Integer.toString(outputCount.count));
 		writer.write('\t');
 	    }
-	    writer.write(keyString);
+	    writer.write(key.toString());
 	    writer.write('\n');
-	    
+
+	    if (outputCount.output == OUTPUT.ALL) {
+		recordCount++;
+	    }
 	} else if (value instanceof BySubjectRecord) {
 	    BySubjectRecord record = (BySubjectRecord) value;
 	    Writer subjectWriter = writersMap.get(OUTPUT.SUBJECT);
-	    
+
 	    // SUBJECT
-	    subjectWriter.write(keyString);
+	    subjectWriter.write(record.getSubject());
 	    subjectWriter.write('\n');
-	    
+
 	    // bySubject
-	    record.writeTo(writersMap.get(OUTPUT.BY_SUBJECT));
+	    blockOffsetsCallback.setDocId(record.getId());
+	    record.writeTo(bySubjectWriter);
+	    record.getId();
 	} else {
 	    throw new IllegalArgumentException("Don't know how to write a " + value.getClass().getSimpleName());
 	}
@@ -127,6 +147,11 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	for (Writer writer : writersMap.values()) {
 	    writer.close();
 	}
+	bySubjectWriter.close();
+
+	BlockOffsets blockOffsets = blockOffsetsCallback.getBlockOffsets(recordCount);
+	blockOffsets.save(bySubjectOffsetsOutputStream);
+	bySubjectOffsetsOutputStream.close();
     }
 
     public static class OutputFormat extends FileOutputFormat<Text, Object> {

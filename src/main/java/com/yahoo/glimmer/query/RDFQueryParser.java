@@ -11,37 +11,37 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.di.big.mg4j.index.Index;
+import it.unimi.di.big.mg4j.index.IndexIterator;
+import it.unimi.di.big.mg4j.index.TermProcessor;
+import it.unimi.di.big.mg4j.query.nodes.AbstractQueryBuilderVisitor;
+import it.unimi.di.big.mg4j.query.nodes.Align;
+import it.unimi.di.big.mg4j.query.nodes.And;
+import it.unimi.di.big.mg4j.query.nodes.Consecutive;
+import it.unimi.di.big.mg4j.query.nodes.Difference;
+import it.unimi.di.big.mg4j.query.nodes.False;
+import it.unimi.di.big.mg4j.query.nodes.LowPass;
+import it.unimi.di.big.mg4j.query.nodes.MultiTerm;
+import it.unimi.di.big.mg4j.query.nodes.Not;
+import it.unimi.di.big.mg4j.query.nodes.Or;
+import it.unimi.di.big.mg4j.query.nodes.OrderedAnd;
+import it.unimi.di.big.mg4j.query.nodes.Prefix;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitor;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.query.nodes.Range;
+import it.unimi.di.big.mg4j.query.nodes.Remap;
+import it.unimi.di.big.mg4j.query.nodes.Select;
+import it.unimi.di.big.mg4j.query.nodes.Term;
+import it.unimi.di.big.mg4j.query.nodes.True;
+import it.unimi.di.big.mg4j.query.nodes.Weight;
+import it.unimi.di.big.mg4j.query.parser.QueryParser;
+import it.unimi.di.big.mg4j.query.parser.QueryParserException;
+import it.unimi.di.big.mg4j.query.parser.SimpleParser;
+import it.unimi.di.big.mg4j.search.DocumentIterator;
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.index.Index;
-import it.unimi.di.mg4j.index.IndexIterator;
-import it.unimi.di.mg4j.index.TermProcessor;
-import it.unimi.di.mg4j.query.nodes.AbstractQueryBuilderVisitor;
-import it.unimi.di.mg4j.query.nodes.Align;
-import it.unimi.di.mg4j.query.nodes.And;
-import it.unimi.di.mg4j.query.nodes.Consecutive;
-import it.unimi.di.mg4j.query.nodes.Difference;
-import it.unimi.di.mg4j.query.nodes.False;
-import it.unimi.di.mg4j.query.nodes.LowPass;
-import it.unimi.di.mg4j.query.nodes.MultiTerm;
-import it.unimi.di.mg4j.query.nodes.Not;
-import it.unimi.di.mg4j.query.nodes.Or;
-import it.unimi.di.mg4j.query.nodes.OrderedAnd;
-import it.unimi.di.mg4j.query.nodes.Prefix;
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitor;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.query.nodes.Range;
-import it.unimi.di.mg4j.query.nodes.Remap;
-import it.unimi.di.mg4j.query.nodes.Select;
-import it.unimi.di.mg4j.query.nodes.Term;
-import it.unimi.di.mg4j.query.nodes.True;
-import it.unimi.di.mg4j.query.nodes.Weight;
-import it.unimi.di.mg4j.query.parser.QueryParser;
-import it.unimi.di.mg4j.query.parser.QueryParserException;
-import it.unimi.di.mg4j.query.parser.SimpleParser;
-import it.unimi.di.mg4j.search.DocumentIterator;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -227,12 +227,12 @@ public class RDFQueryParser implements QueryParser {
 		if (alignmentIndex != null) {
 		    ii = alignmentIndex.documents(term.term);
 		    if (ii.mayHaveNext()) {
-			int f = ii.nextDocument();
+			long f = ii.nextDocument();
 			while (f != DocumentIterator.END_OF_LIST) {
-			    if (fieldNamesSet.contains(properties.get(f))) {
+			    if (fieldNamesSet.contains(properties.get((int)f))) {
 				// System.err.println( "From vertical index: " +
 				// properties.get( f ) );
-				disjuncts.add(new Select(properties.get(f), term));
+				disjuncts.add(new Select(properties.get((int)f), term));
 			    }
 			    f = ii.nextDocument();
 			}
@@ -344,7 +344,5 @@ public class RDFQueryParser implements QueryParser {
 	public MyVisitor copy() {
 	    return new MyVisitor();
 	}
-
     }
-
 }

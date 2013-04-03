@@ -19,14 +19,18 @@ import java.util.List;
 public class RDFQueryResult {
     private final List<RDFResultItem> resultItems;
     private final int numResults;
+    private final int pageStart;
+    private final int pageSize;
     private final int time;
     private final String query;
     private final String parsedQuery;
 
-    public RDFQueryResult(String query, String parsedQuery, int numResults, List<RDFResultItem> resultItems, int time) {
+    public RDFQueryResult(String query, String parsedQuery, int numResults, int pageStart, int pageSize, List<RDFResultItem> resultItems, int time) {
 	super();
 	this.resultItems = resultItems;
 	this.numResults = numResults;
+	this.pageStart = pageStart;
+	this.pageSize = pageSize;
 	this.time = time;
 	this.query = query != null ? query : "";
 	this.parsedQuery = parsedQuery;
@@ -38,6 +42,14 @@ public class RDFQueryResult {
 
     public int getNumResults() {
 	return numResults;
+    }
+    
+    public int getPageStart() {
+	return pageStart;
+    }
+    
+    public int getPageSize() {
+	return pageSize;
     }
 
     public long getTime() {

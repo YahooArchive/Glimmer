@@ -102,10 +102,10 @@ public class TermKey implements WritableComparable<TermKey> {
     }
 
     private static final int TYPE_BYTE_OFFSET = 0;
-    private static final int V1_BYTE_OFFSET = 1 * Integer.SIZE / 8;
-    private static final int V2_BYTE_OFFSET = 2 * Integer.SIZE / 8;
-    private static final int INDEX_BYTE_OFFSET = 3 * Integer.SIZE / 8;
-    private static final int TERM_BYTE_OFFSET = 4 * Integer.SIZE / 8;
+    private static final int V1_BYTE_OFFSET = Integer.SIZE / 8;
+    private static final int V2_BYTE_OFFSET = V1_BYTE_OFFSET + Long.SIZE / 8;
+    private static final int INDEX_BYTE_OFFSET = V2_BYTE_OFFSET + Integer.SIZE / 8;
+    private static final int TERM_BYTE_OFFSET = INDEX_BYTE_OFFSET + Integer.SIZE / 8;
 
     /** A Comparator that compares serialized TermKey objects. */
     public static class Comparator extends WritableComparator {
@@ -136,10 +136,12 @@ public class TermKey implements WritableComparable<TermKey> {
 		    d = type1 - type2;
 		    if (d == 0) {
 			// Compare the values v1s
-			int v11 = WritableComparator.readInt(b1, s1 + V1_BYTE_OFFSET);
-			int v12 = WritableComparator.readInt(b2, s2 + V1_BYTE_OFFSET);
-			d = v11 - v12;
-			if (d == 0) {
+			long v11 = WritableComparator.readLong(b1, s1 + V1_BYTE_OFFSET);
+			long v12 = WritableComparator.readLong(b2, s2 + V1_BYTE_OFFSET);
+			long dl = v11 - v12;
+			if (dl != 0) {
+			    d = dl > 0 ? 1 : -1;
+			} else {
 			    // Compare the values v2s
 			    int v21 = WritableComparator.readInt(b1, s1 + V2_BYTE_OFFSET);
 			    int v22 = WritableComparator.readInt(b2, s2 + V2_BYTE_OFFSET);
@@ -197,7 +199,7 @@ public class TermKey implements WritableComparable<TermKey> {
     public static class FirstPartitioner extends HashPartitioner<TermKey, TermValue> {
 	@Override
 	public int getPartition(TermKey key, TermValue value, int numPartitions) {
-	    return Math.abs(key.getTerm().hashCode() * 127) % numPartitions;
+	    return (int)(Math.abs(key.getTerm().hashCode() * 127l) % numPartitions);
 	}
     }
 }

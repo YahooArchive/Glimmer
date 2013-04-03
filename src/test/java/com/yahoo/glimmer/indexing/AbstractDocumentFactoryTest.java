@@ -24,7 +24,8 @@ import org.junit.Before;
 public class AbstractDocumentFactoryTest {
     protected static final byte[] CONTENT_BYTES = ("33\t22\thttp://subject/\t" +
     		"<http://predicate/1> <http://object/1> <file:/tmp/source> .\t" +
-    		"<http://predicate/2> <http://object/2> .\t" +
+    		"<http://predicate/2> <http://object/2a> .\t" +
+    		"<http://predicate/2> <http://object/2b> .\t" +
     		"<http://predicate/3> \"object 3\"@en <http://context/1> .\t" + 
     		"<http://predicate/4/FOUR> _:BNodeId123 .\t").getBytes();
     
@@ -62,7 +63,8 @@ public class AbstractDocumentFactoryTest {
 	resourcesHash.put("http://subject/", 33l);
 	resourcesHash.put("http://context/1", 55l);
 	resourcesHash.put("http://object/1", 45l);
-	resourcesHash.put("http://object/2", 46l);
+	resourcesHash.put("http://object/2a", 46l);
+	resourcesHash.put("http://object/2b", 47l);
 	resourcesHash.put("http://predicate/1",60l);
 	resourcesHash.put("http://predicate/2", 61l);
 	resourcesHash.put("http://predicate/3", 62l);

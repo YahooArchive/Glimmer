@@ -12,8 +12,8 @@ package com.yahoo.glimmer.indexing.generator;
  */
 
 import it.unimi.dsi.io.OutputBitStream;
-import it.unimi.di.mg4j.index.IndexWriter;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndexWriter;
+import it.unimi.di.big.mg4j.index.IndexWriter;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndexWriter;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -37,7 +37,7 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
     private static final Log LOG = LogFactory.getLog(IndexRecordWriter.class);
     private Map<Integer, IndexWrapper> indices = new HashMap<Integer, IndexWrapper>();
 
-    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, int indexWriterCacheSize,
+    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, long numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, int indexWriterCacheSize,
 	    String... fieldNames) throws IOException {
 	if (indexType == RDFDocumentFactory.IndexType.VERTICAL) {
 	    // Open the alignment index
@@ -164,7 +164,7 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
 
 	    Path taskWorkPath = getDefaultWorkFile(job, "");
 
-	    int numberOfDocuments = conf.getInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, -1);
+	    long numberOfDocuments = conf.getLong(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, -1);
 	    if (numberOfDocuments < 0) {
 		throw new IllegalArgumentException("Number of documents not set.");
 	    }

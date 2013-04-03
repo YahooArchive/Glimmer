@@ -16,7 +16,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
-    private int document;
+    private long document;
     private int[] occurrences;
     private int occurrenceCount;
 
@@ -27,10 +27,10 @@ public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
 	occurrences = new int[initialOccurrencesSize];
     }
     
-    public int getDocument() {
+    public long getDocument() {
 	return document;
     }
-    public void setDocument(int document) {
+    public void setDocument(long document) {
 	this.document = document;
     }
 
@@ -93,7 +93,7 @@ public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
     @Override
     public int hashCode() {
 	int hash = 7;
-	hash = 31 * hash + document;
+	hash = 31 * hash + (int)(document ^ (document >>> 32));
 	hash = 31 * hash + occurrenceCount;
 	for (int i = 0; i < occurrenceCount; i++) {
 	    hash = 31 * hash + occurrences[i];

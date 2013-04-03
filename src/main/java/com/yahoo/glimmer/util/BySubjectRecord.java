@@ -22,11 +22,11 @@ import java.util.ArrayList;
 
 public class BySubjectRecord {
     private static final Charset CHARSET = Charset.forName("UTF-8");
-    private static final char RECORD_DELIMITER = '\n';
-    private static final char FIELD_DELIMITER = '\t';
+    public static final char RECORD_DELIMITER = '\n';
+    public static final char FIELD_DELIMITER = '\t';
     private static final int MAX_RELATIONS = 10000;
 
-    private int id;
+    private long id;
     /**
      * Because the doc id's have to line up with what is in the 'all resources'
      * hash(to avoid having a separate 'subjects' hash), the id's don't run
@@ -35,7 +35,7 @@ public class BySubjectRecord {
      * 0, as it may be preceded by empty docs. The previousId is used to keep
      * the doc ids consistent when setting the first doc id in a split.
      */
-    private int previousId = -1;
+    private long previousId = -1;
     private String subject;
     private final ArrayList<String> relations = new ArrayList<String>();
 
@@ -77,16 +77,22 @@ public class BySubjectRecord {
     public boolean parse(Reader reader, StringBuilder sb) throws IOException {
 	readUntil(reader, sb, FIELD_DELIMITER);
 	try {
-	    id = Integer.parseInt(sb.toString());
+	    id = Long.parseLong(sb.toString());
 	} catch (NumberFormatException e) {
 	    return false;
+	}
+	if (id < 0) {
+	    throw new IllegalStateException("Negative doc ID:" + id);
 	}
 
 	readUntil(reader, sb, FIELD_DELIMITER);
 	try {
-	    previousId = Integer.parseInt(sb.toString());
+	    previousId = Long.parseLong(sb.toString());
 	} catch (NumberFormatException e) {
 	    return false;
+	}
+	if (previousId < -1) {
+	    throw new IllegalStateException("Negative doc previousId:" + previousId);
 	}
 
 	readUntil(reader, sb, FIELD_DELIMITER);
@@ -113,19 +119,25 @@ public class BySubjectRecord {
 	return true;
     }
 
-    public int getId() {
+    public long getId() {
 	return id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
+	if (id < 0) {
+	    throw new IllegalArgumentException("setId() given negative value:" + id);
+	}
 	this.id = id;
     }
 
-    public int getPreviousId() {
+    public long getPreviousId() {
 	return previousId;
     }
 
-    public void setPreviousId(int previousId) {
+    public void setPreviousId(long previousId) {
+	if (previousId < 0) {
+	    throw new IllegalArgumentException("setPreviousId() given negative value:" + id);
+	}
 	this.previousId = previousId;
     }
 
@@ -219,9 +231,9 @@ public class BySubjectRecord {
     }
 
     public void writeTo(Writer writer) throws IOException {
-	writer.write(Integer.toString(id));
+	writer.write(Long.toString(id));
 	writer.write(FIELD_DELIMITER);
-	writer.write(Integer.toString(previousId));
+	writer.write(Long.toString(previousId));
 	writer.write(FIELD_DELIMITER);
 	if (subject != null) {
 	    writer.write(subject);

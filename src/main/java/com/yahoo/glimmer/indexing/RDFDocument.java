@@ -38,7 +38,7 @@ public abstract class RDFDocument {
     /** The cached raw content. */
     private byte[]  contentBytes;
     private int contentLength;
-    private Integer id;
+    private Long id;
     private String subject;
 
     public abstract WordReader content(final int field) throws IOException;
@@ -96,7 +96,7 @@ public abstract class RDFDocument {
 	ensureParsed_(relations.iterator());
     }
 
-    public int getId() {
+    public long getId() {
 	try {
 	    ensureParsed();
 	} catch (IOException e) {

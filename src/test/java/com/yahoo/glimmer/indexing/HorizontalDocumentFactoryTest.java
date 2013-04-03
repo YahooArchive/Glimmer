@@ -27,7 +27,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	HorizontalDocumentFactory.setupConf(conf, true, null, "@");
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory)RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
-	assertEquals(4, factory.getFieldCount());
+	assertEquals(5, factory.getFieldCount());
 	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
@@ -37,10 +37,26 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
 	
+	WordArrayReader subjectReader = (WordArrayReader)document.content(0);
+	assertTrue(subjectReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
+	assertFalse(subjectReader.next(word, nonWord));
+	
+	WordArrayReader subjectTextReader = (WordArrayReader)document.content(1);
+	// The subjectText contains both the ResourceID and the tokens from the URL/BNode.
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("subject", word.toString());
+	assertEquals("", nonWord.toString());
+	assertFalse(subjectTextReader.next(word, nonWord));
+	
 	// token, predicate & context are positional/parallel indexes.
-	WordArrayReader objectReader = (WordArrayReader)document.content(0);
-	WordArrayReader predicateReader = (WordArrayReader)document.content(1);
-	WordArrayReader contextReader = (WordArrayReader)document.content(2);
+	WordArrayReader objectReader = (WordArrayReader)document.content(2);
+	WordArrayReader predicateReader = (WordArrayReader)document.content(3);
+	WordArrayReader contextReader = (WordArrayReader)document.content(4);
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("@45", word.toString());
@@ -63,6 +79,16 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@47", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("@61", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -96,15 +122,9 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertFalse(predicateReader.next(word, nonWord));
 	assertFalse(contextReader.next(word, nonWord));
 	
-	WordArrayReader uriReader = (WordArrayReader)document.content(3);
-	assertTrue(uriReader.next(word, nonWord));
-	assertEquals("subject", word.toString());
-	assertEquals("", nonWord.toString());
-	assertFalse(uriReader.next(word, nonWord));
-	
 	context.assertIsSatisfied();
 	
-	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
@@ -112,7 +132,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	HorizontalDocumentFactory.setupConf(conf, false, null, "@");
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
-	assertEquals(4, factory.getFieldCount());
+	assertEquals(5, factory.getFieldCount());
 	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
@@ -121,10 +141,26 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
 	
+	WordArrayReader subjectReader = (WordArrayReader)document.content(0);
+	assertTrue(subjectReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
+	assertFalse(subjectReader.next(word, nonWord));
+	
+	WordArrayReader subjectTextReader = (WordArrayReader)document.content(1);
+	// The subjectText contains both the ResourceID and the tokens from the URL/BNode.
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("subject", word.toString());
+	assertEquals("", nonWord.toString());
+	assertFalse(subjectTextReader.next(word, nonWord));
+	
 	// token, predicate & context are positional/parallel indexes.
-	WordArrayReader objectReader = (WordArrayReader)document.content(0);
-	WordArrayReader predicateReader = (WordArrayReader)document.content(1);
-	WordArrayReader contextReader = (WordArrayReader)document.content(2);
+	WordArrayReader objectReader = (WordArrayReader)document.content(2);
+	WordArrayReader predicateReader = (WordArrayReader)document.content(3);
+	WordArrayReader contextReader = (WordArrayReader)document.content(4);
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("@45", word.toString());
@@ -138,6 +174,16 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("@46", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("@61", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@47", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
 	assertEquals("@61", word.toString());
@@ -180,14 +226,8 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertFalse(predicateReader.next(word, nonWord));
 	assertFalse(contextReader.next(word, nonWord));
 	
-	WordArrayReader uriReader = (WordArrayReader)document.content(3);
-	assertTrue(uriReader.next(word, nonWord));
-	assertEquals("subject", word.toString());
-	assertEquals("", nonWord.toString());
-	assertFalse(uriReader.next(word, nonWord));
-	
 	context.assertIsSatisfied();
 	
-	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

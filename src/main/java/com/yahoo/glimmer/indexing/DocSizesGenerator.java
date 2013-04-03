@@ -11,17 +11,18 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.Iterator;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,10 +36,11 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -54,30 +56,29 @@ public class DocSizesGenerator extends Configured implements Tool {
     private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
     private static final String PREDICATES_ARG = "properties";
-    
-    
+
     // Job configuration attribute names
     private static final String PROPERTIES_ARGS = "properties";
     private static final String RESOURCES_HASH_ARG = "resourcesHash";
     private static final String OUTPUT_DIR_ARG = "OUTPUT_DIR";
     private static final String NUMBER_OF_DOCUMENTS_ARG = "NUMBER_OF_DOCUMENTS";
-    
+
     private static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
     private static final String HASH_VALUE_PREFIX = "@";
-    
+
     private static enum Counters {
 	NUMBER_OF_RECORDS, INDEXED_OCCURRENCES, FAILED_PARSING
     }
 
     public static class DocSize implements WritableComparable<DocSize>, Cloneable {
-	private int document, size;
-	private static final DocSizeComparator comparator = new DocSizeComparator();
+	private long document;
+	private int size;
 
 	// Hadoop needs this
 	public DocSize() {
 	}
 
-	public DocSize(int document, int size) {
+	public DocSize(long document, int size) {
 	    this.document = document;
 	    this.size = size;
 	}
@@ -87,11 +88,11 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    this.size = p.size;
 	}
 
-	public int getDocument() {
+	public long getDocument() {
 	    return document;
 	}
 
-	public void setDocument(int document) {
+	public void setDocument(long document) {
 	    this.document = document;
 	}
 
@@ -104,12 +105,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
 
 	public void readFields(DataInput in) throws IOException {
-	    document = in.readInt();
+	    document = in.readLong();
 	    size = in.readInt();
 	}
 
 	public void write(DataOutput out) throws IOException {
-	    out.writeInt(document);
+	    out.writeLong(document);
 	    out.writeInt(size);
 	}
 
@@ -126,7 +127,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	@Override
 	public int hashCode() {
 	    int hash = 7;
-	    hash = 31 * hash + document;
+	    hash = 31 * hash + (int) (document ^ document >>> 32);
 	    hash = 31 * hash + size;
 	    return hash;
 	}
@@ -135,33 +136,25 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    return document + ":" + size;
 	}
 
-	public int compareTo(DocSize o) {
-	    return comparator.compare(this, o);
-
+	public int compareTo(DocSize that) {
+	    if (this.document < that.document) {
+		return -1;
+	    } else if (this.document > that.document) {
+		return +1;
+	    } else {
+		if (this.size < that.size) {
+		    return -1;
+		} else if (this.size > that.size) {
+		    return +1;
+		}
+	    }
+	    return 0;
 	}
 
 	public Object clone() {
 	    return new DocSize(document, size);
 	}
 
-    }
-
-    public static class DocSizeComparator implements Comparator<DocSize> {
-
-	public int compare(DocSize o1, DocSize o2) {
-	    if (o1.document < o2.document) {
-		return -1;
-	    } else if (o1.document > o2.document) {
-		return +1;
-	    } else {
-		if (o1.size < o2.size) {
-		    return -1;
-		} else if (o1.size > o2.size) {
-		    return +1;
-		}
-	    }
-	    return 0;
-	}
     }
 
     /*
@@ -193,21 +186,22 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
 
 	public void readFields(DataInput in) throws IOException {
-	    ds.readFields(in);
 	    index = in.readInt();
+	    ds.readFields(in);
 	}
 
 	public void write(DataOutput out) throws IOException {
-	    ds.write(out);
 	    out.writeInt(index);
+	    ds.write(out);
 	}
 
-	public int compareTo(IndexDocSizePair other) {
-	    if (index != other.index) {
-		return ((Integer) index).compareTo(other.index);
-	    } else {
-		return ds.compareTo(other.ds);
+	public int compareTo(IndexDocSizePair that) {
+	    if (this.index < that.index) {
+		return -1;
+	    } else if (this.index > that.index) {
+		return 1;
 	    }
+	    return this.ds.compareTo(that.ds);
 	}
 
 	@Override
@@ -231,47 +225,45 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     /**
-     * Partition based only on the term
+     * Each reducer builds one or more indexes. We partition by index, so all
+     * key,value pairs for that index go to the same reducer.
      */
-    public static class FirstPartitioner extends HashPartitioner<IndexDocSizePair, DocSize> {
+    public static class FirstPartitioner extends Partitioner<IndexDocSizePair, DocSize> {
 	@Override
 	public int getPartition(IndexDocSizePair key, DocSize value, int numPartitions) {
-	    return Math.abs(key.getIndex() * 127) % numPartitions;
+	    return key.getIndex() % numPartitions;
 	}
     }
 
     /**
-     * Compare only the first part of the pair, so that reduce is called once
-     * for each value of the first part.
-     * 
-     * NOTE: first part (i.e. index and term) are serialized first
+     * Setting this as the fist grouping comparator 'groups' all values for the
+     * given index into one call to reduce
      */
     public static class FirstGroupingComparator implements RawComparator<IndexDocSizePair> {
 	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-	    // Skip the first two integers
-	    int intsize = Integer.SIZE / 8;
-	    return WritableComparator.compareBytes(b1, s1 + intsize * 2, l1 - intsize * 2, b2, s2 + intsize * 2, l2 - intsize * 2);
+	    return WritableComparator.compareBytes(b1, s1, 4, b2, s2, 4);
 	}
 
 	public int compare(IndexDocSizePair o1, IndexDocSizePair o2) {
-	    if (o1.index != o2.index) {
-		return ((Integer) o1.index).compareTo(o2.index);
-	    }
-	    return 0;
+	    return o1.index - o2.index;
 	}
     }
 
-    public static class MapClass extends Mapper<LongWritable, RDFDocument, IndexDocSizePair, DocSize> {
+    public static class MapClass extends Mapper<LongWritable, Text, IndexDocSizePair, DocSize> {
 	private String[] fields;
-	
+	private RDFDocument doc;
+
 	@Override
 	public void setup(Context context) {
-	    fields = RDFDocumentFactory.getFieldsFromConf(context.getConfiguration());
+	    Configuration conf = context.getConfiguration();
+	    fields = RDFDocumentFactory.getFieldsFromConf(conf);
+	    doc = RDFDocumentFactory.buildFactory(conf).getDocument();
 	}
 
 	@Override
-	public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
-
+	public void map(LongWritable key, Text record, Context context) throws IOException, InterruptedException {
+	    doc.setContent(record.getBytes(), record.getLength());
+	    
 	    if (doc == null || doc.getSubject() == null) {
 		// Failed parsing
 		context.getCounter(Counters.FAILED_PARSING).increment(1);
@@ -280,22 +272,24 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    }
 
 	    // Iterate over all indices
-	    for (int i = 0; i < fields.length; i++) {
-		if (fields[i].startsWith("NOINDEX")) {
+	    for (int indexId = 0; indexId < fields.length; indexId++) {
+		if (fields[indexId].startsWith("NOINDEX")) {
 		    continue;
 		}
 
 		// Iterate in parallel over the words of the indices
 		MutableString term = new MutableString("");
 		MutableString nonWord = new MutableString("");
-		WordReader termReader = (WordReader) doc.content(i);
+		WordReader termReader = (WordReader) doc.content(indexId);
 		int position = 0;
 
 		while (termReader.next(term, nonWord)) {
 		    // Read next property as well
 		    if (term != null) {
 			// Report progress
-			context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
+			if (position % 1000 == 0) {
+			    context.setStatus(fields[indexId] + "=" + term.substring(0, Math.min(term.length(), 50)));
+			}
 			position++;
 			context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
 		    } else {
@@ -305,19 +299,19 @@ public class DocSizesGenerator extends Configured implements Tool {
 		// Position now contains the size of the current field
 		if (position > 0) {
 		    DocSize ds = new DocSize(doc.getId(), position);
-		    context.write(new IndexDocSizePair(i, ds), ds);
+		    context.write(new IndexDocSizePair(indexId, ds), ds);
 		}
 	    }
 
 	    context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
-
 	}
     }
 
     public static class ReduceClass extends Reducer<IndexDocSizePair, DocSize, Text, Text> {
+	private static final Log LOG = LogFactory.getLog(ReduceClass.class);
 	private String outputDir;
 	private FileSystem fs;
-	private int numdocs;
+	private long numdocs;
 	private String[] fields;
 
 	@Override
@@ -341,51 +335,46 @@ public class DocSizesGenerator extends Configured implements Tool {
 		}
 
 		// Number of documents
-		numdocs = conf.getInt(NUMBER_OF_DOCUMENTS_ARG, 0);
+		numdocs = conf.getLong(NUMBER_OF_DOCUMENTS_ARG, 0);
 	    } catch (IOException e) {
-
 		throw new RuntimeException(e);
 	    }
 	}
 
+	
 	@Override
 	public void reduce(IndexDocSizePair key, Iterable<DocSize> values, Context context) throws IOException, InterruptedException {
 	    if (key == null || key.equals("")) {
 		return;
 	    }
-	    
-	    System.out.println("Processing index: " + fields[key.index]);
+
+	    LOG.info("Processing index: " + fields[key.index]);
 
 	    // Decide which file we are going to write to
 	    Path sizesPath = new Path(outputDir + fields[key.index] + DiskBasedIndex.SIZES_EXTENSION);
-	    OutputBitStream stream = new OutputBitStream(fs.create(sizesPath, true));// overwrite
+	    OutputBitStream stream = new OutputBitStream(fs.create(sizesPath, false)); // throws exception if file exists.
 	    fs.setPermission(sizesPath, ALL_PERMISSIONS);
 
-	    long occurrences = 0;
-	    int prevDocID = -1;
+	    long valueCount = 0;
+	    long prevDocID = -1;
 	    Iterator<DocSize> valueIt = values.iterator();
 	    while (valueIt.hasNext()) {
 		DocSize value = valueIt.next();
-		if ((prevDocID + 1) < value.document) {
-		    System.out.println("Writing zeroes from " + (prevDocID + 1) + " to " + value.document);
-		}
-		for (int i = prevDocID + 1; i < value.document; i++) {
+		
+		for (long i = prevDocID + 1; i < value.document; i++) {
 		    stream.writeGamma(0);
 		}
 		stream.writeGamma(value.size);
-		occurrences += value.size;
 		prevDocID = value.document;
 	    }
-	    if ((prevDocID + 1) < numdocs) {
-		System.out.println("Writing zeroes  from " + (prevDocID + 1) + " to " + numdocs);
-	    }
-	    for (int i = prevDocID + 1; i < numdocs; i++) {
+	    
+	    for (long i = prevDocID + 1; i < numdocs; i++) {
 		stream.writeGamma(0);
 	    }
 
 	    stream.close();
-
-	    System.out.println("Total number of occurrences: " + occurrences);
+	    LOG.info("Values processed: " + valueCount);
+	    LOG.info("Closed index: " + fields[key.index]);
 	}
     }
 
@@ -396,10 +385,9 @@ public class DocSizesGenerator extends Configured implements Tool {
 			"Subset of the properties to be indexed."),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
-		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
+		new UnflaggedOption("numdocs", JSAP.LONG_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
-		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
-	});
+		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."), });
 
 	JSAPResult args = jsap.parse(arg);
 
@@ -418,7 +406,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	job.setJobName("DocSizesGenerator" + System.currentTimeMillis());
 
-	job.setInputFormatClass(RDFInputFormat.class);
+	job.setInputFormatClass(TextInputFormat.class);
 
 	job.setOutputKeyClass(Text.class);
 	job.setOutputValueClass(Text.class);
@@ -435,7 +423,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	Configuration conf = job.getConfiguration();
 
-	conf.setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
+	conf.setLong(NUMBER_OF_DOCUMENTS_ARG, args.getLong("numdocs"));
 
 	conf.set(OUTPUT_DIR_ARG, args.getString("output"));
 

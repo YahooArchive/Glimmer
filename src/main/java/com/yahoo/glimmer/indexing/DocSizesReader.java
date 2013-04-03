@@ -34,6 +34,7 @@ public class DocSizesReader {
 	while (stream.hasNext()) {
 	    System.out.println(stream.readGamma());
 	}
+	stream.close();
     }
 
 }
