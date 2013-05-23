@@ -23,22 +23,21 @@ YUI.add('yui-pager', function (Y){
 		showingResultsOf: " of ",
 		pagerElements: undefined,
 		statusElements: undefined
-	}
+	};
 	
 	function appendElement(element, innerHtml, targetPage, current) {
 		var anchor = Y.Node.create("<a href='#'></a>");
 		anchor.addClass(state.anchorClass);
 		anchor.appendChild(innerHtml);
 		if (current) {
-			anchor.addClass(state.anchorClassCurrent)
+			anchor.addClass(state.anchorClassCurrent);
 		} else {
 			anchor.on('click', function (e) {
 				e.preventDefault();
 				
-				if (state.callback != undefined) {
+				if (state.callback !== undefined) {
 					state.callback(targetPage, state);
 				} else {
-					alert(targetPage);
 					this.setState({
 						page: targetPage
 					});
@@ -48,41 +47,7 @@ YUI.add('yui-pager', function (Y){
 		
 		element.appendChild(anchor);
 	}
-	
-	function getRelativePageNumbers() {
-		var a = new Array();
-		a.push(0);
-		
-		var d = 1;
-		
-		var pages = getNumberOfPages();
 
-		while (state.page - d >= 1 || state.page + d <= pages) {
-			if (state.page - d >= 1) {
-				a.unshift( -d);
-			}
-			if (state.page + d <= pages) {
-				a.push(d);
-			}
-			if (d == 1) {
-				d = 2;
-			} else if (d == 2) {
-				d = 5;
-			} else if ( (100 * Math.log(d) / Math.LN10) % 100 == 0 ) {
-				// power of 10.
-				d *= 5;
-			} else {
-				d *= 2;
-			}
-		}
-		
-		return a;
-	}
-	
-	function getNumberOfPages() {
-		return Math.ceil(state.items / state.pageSize);
-	}
-	
 	Y.extend(Pager, Y.Base, {
 		initializer: function(config) { },
 		destructor: function() { },
@@ -102,14 +67,14 @@ YUI.add('yui-pager', function (Y){
 				}
 			}
 			if (changed) {
-				if (state.pagerElements != undefined) {
-					for (var i in state.pagerElements) {
+				if (state.pagerElements !== undefined) {
+					for (var i = 0 ; i < state.pagerElements.length ; i++) {
 						this.renderPager(state.pagerElements[i]);
 					}
 				}
-				if (state.statusElements != undefined) {
-					for (var i in state.statusElements) {
-						this.renderStatus(state.statusElements[i]);
+				if (state.statusElements !== undefined) {
+					for (var j = 0 ; j < state.statusElements.length ; j++) {
+						this.renderStatus(state.statusElements[j]);
 					}
 				}
 			}
@@ -122,30 +87,30 @@ YUI.add('yui-pager', function (Y){
 		renderPager: function(pagerElementId) {
 			var rootElement = Y.one(pagerElementId);
 			rootElement.setContent("");
-			var pages = getNumberOfPages();
+			var pages = this.getNumberOfPages();
 			
-			if (pages > 0) {
+			if (pages > 1) {
 				if (state.page > 1) {
 					appendElement(rootElement, state.first, 1);
 					appendElement(rootElement, state.previous, state.page - 1);
 				}
-				var relativePageNumbers = getRelativePageNumbers();
-				for (var i in relativePageNumbers) {
+				var relativePageNumbers = this.getRelativePageNumbers();
+				for (var i = 0 ; i < relativePageNumbers.length ; i++) {
 					var delta = relativePageNumbers[i];
-					var label = delta == 0 ? state.page : (delta > 0) ? '+' + delta : delta;
+					var label = state.page + delta;
 					var pageNumber = state.page + delta;
 					appendElement(rootElement, label, pageNumber, pageNumber == state.page);
 				}
 				
 				if (state.page < pages) {
 					appendElement(rootElement, state.next, state.page + 1);
-					appendElement(rootElement, state.last, pages);
+					//appendElement(rootElement, state.last, pages);
 				}
 			}
 		},
 		
 		renderStatus: function(statusElementId) {
-			var pages = getNumberOfPages();
+			var pages = this.getNumberOfPages();
 			
 			var rootElement = Y.one(statusElementId);
 			rootElement.setContent("");
@@ -165,16 +130,42 @@ YUI.add('yui-pager', function (Y){
 		},
 		
 		clear: function() {
-			if (state.pagerElements != undefined) {
-				for (var i in state.pagerElements) {
+			if (state.pagerElements !== undefined) {
+				for (var i = 0 ; i < state.pagerElements.length ; i++) {
 					Y.one(state.pagerElements[i]).setContent("");
 				}
 			}
-			if (state.statusElements != undefined) {
-				for (var i in state.statusElements) {
-					Y.one(state.statusElements[i]).setContent("");
+			if (state.statusElements !== undefined) {
+				for (var j = 0 ; j < state.statusElements.length ; j++) {
+					Y.one(state.statusElements[j]).setContent("");
 				}
 			}
+		},
+		
+		getRelativePageNumbers: function() {
+			var a = [];
+			a.push(0);
+			
+			var d = 1;
+			
+			var pages = this.getNumberOfPages();
+
+			while (d < 8 && a.length < 8) {
+				if (state.page - d >= 1) {
+					a.unshift( -d);
+				}
+				if (state.page + d <= pages) {
+					a.push(d);
+				}
+				
+				d++;
+			}
+			
+			return a;
+		},
+		
+		getNumberOfPages: function() {
+			return Math.ceil(state.items / state.pageSize);
 		}
 	});
 	

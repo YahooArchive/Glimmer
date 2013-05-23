@@ -14,15 +14,24 @@ package com.yahoo.glimmer.indexing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collection;
 
 import org.junit.Test;
+import org.semanticweb.owlapi.apibinding.OWLManager;
+import org.semanticweb.owlapi.model.OWLOntology;
+import org.semanticweb.owlapi.model.OWLOntologyCreationException;
+import org.semanticweb.owlapi.model.OWLOntologyManager;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
+    private static final String SCHEMA_DOT_ORG_OWL_FILE = "schemaDotOrg.owl";
+
     @Test
     public void test1() throws IOException {
 	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, "@", new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
@@ -33,6 +42,7 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 
 	VerticalDocumentFactory factory = (VerticalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
+		
 	assertEquals(3, factory.getFieldCount());
 	VerticalDocument document = (VerticalDocument) factory.getDocument();
 	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
@@ -71,5 +81,45 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	context.assertIsSatisfied();
 
 	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+    }
+    
+    @Test
+    public void ontologyTest() throws IOException {
+	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, "@", new String[] { "afield" });
+	VerticalDocumentFactory factory = (VerticalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
+	
+	// Set the ontology.
+	InputStream owlOntologgyInputStream = VerticalDocumentFactoryTest.class.getClassLoader().getResourceAsStream(SCHEMA_DOT_ORG_OWL_FILE);
+	if (owlOntologgyInputStream == null) {
+	    fail("Couldn't 'class load' the ontology file " + SCHEMA_DOT_ORG_OWL_FILE);
+	}
+	try {
+	    OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+	    OWLOntology ontology = manager.loadOntologyFromOntologyDocument(owlOntologgyInputStream);
+	    factory.setOntology(ontology);
+	} catch (OWLOntologyCreationException e) {
+	    throw new IllegalArgumentException("Ontology failed to load:" + e.getMessage());
+	}
+	owlOntologgyInputStream.close();
+	
+	Collection<String> types = factory.getAncestors("http://schema.org/WebPage");
+	System.out.println(types);
+	assertEquals(2, types.size());
+	assertTrue(types.contains("http://schema.org/CreativeWork"));
+	assertTrue(types.contains("http://schema.org/Thing"));
+	
+	// LocalBusiness is interesting because it is both a Organization and a Place.
+	types = factory.getAncestors("http://schema.org/LocalBusiness");
+	System.out.println(types);
+	assertEquals(3, types.size());
+	assertTrue(types.contains("http://schema.org/Place"));
+	assertTrue(types.contains("http://schema.org/Organization"));
+	assertTrue(types.contains("http://schema.org/Thing"));
+	
+	types = factory.getAncestors("http://schema.org/Thing");
+	assertEquals(0, types.size());
+	
+	types = factory.getAncestors("http://schema.org/NotASchemaDotOrgType");
+	assertEquals(0, types.size());
     }
 }

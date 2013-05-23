@@ -116,7 +116,7 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
 		    accumulatedTermFrequency = 0;
 		    accumulatedOccurrenceCount = 0;
 		    accumulatedSumOfMaxPositions = 0;
-		} else {
+		} else if (value instanceof IndexRecordWriterDocValue) {
 		    IndexRecordWriterDocValue docValue = (IndexRecordWriterDocValue) value;
 
 		    OutputBitStream out = indexWriter.newDocumentRecord();
@@ -131,9 +131,14 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
 			accumulatedOccurrenceCount += occurrenceCount;
 			accumulatedSumOfMaxPositions += docValue.getOccurrences()[occurrenceCount - 1];
 		    }
+		} else if (value instanceof IndexRecordWriterSizeValue) {
+		    IndexRecordWriterSizeValue sizeValue = (IndexRecordWriterSizeValue) value;
+		    index.writeDocSize(sizeValue.getDocument(), sizeValue.getSize());
+		} else {
+		    throw new IllegalArgumentException("Don't know how to write a " + value.getClass().getSimpleName());
 		}
 	    } catch (RuntimeException e) {
-		LOG.warn("Exception for term>" + lastTermValue == null ? "" : lastTermValue.getTerm() + "< and doc value:" + value == null ? "null" : value.toString());
+		LOG.warn("Exception for term >" + (lastTermValue == null ? "null" : lastTermValue.getTerm()) + "< and doc value:" + (value == null ? "null" : value.toString()) );
 		logStats();
 		throw e;
 	    }

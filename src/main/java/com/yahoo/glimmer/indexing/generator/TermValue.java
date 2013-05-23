@@ -34,7 +34,7 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
 	 * For every doc a DOC_STATS is written. v1 = term occurrence count in
 	 * doc. v2 = position of last term occurrence.
 	 */
-	DOC_STATS,
+	TERM_STATS,
 
 	/**
 	 * For each unique term in a doc, a PREDICATE_ID is written. v1 = the id
@@ -46,7 +46,17 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
 	 * For every term in every doc an OCCURRENCE is written. v1 = doc id, v2
 	 * = terms position.
 	 */
-	OCCURRENCE;
+	OCCURRENCE,
+	
+	
+	/**
+	 * To generate the doc sizes for each index we need to know the number of terms per doc per index.
+	 * Unlike the other types the term here is irrelevant. And will be set to TermKey.DOC_SIZE_TERM.
+	 * v1 = the doc id & v2 = term count for this field/index.
+	 * Note that all DOC_SIZE values will only go to mapper 0 and need special handling 
+	 * during index merging.
+	 */
+	DOC_SIZE;
     }
 
     private Type type;
@@ -62,7 +72,7 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     }
 
     public TermValue(Type type, long v1, int v2) {
-	if (type != Type.DOC_STATS && type != Type.OCCURRENCE) {
+	if (type != Type.TERM_STATS && type != Type.OCCURRENCE && type != Type.DOC_SIZE) {
 	    throw new IllegalArgumentException("Type " + type + " is not value with 2 args");
 	}
 	this.type = type;

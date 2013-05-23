@@ -35,7 +35,8 @@ This will produce a jar Glimmer-?.?.?-SNAPSHOT-jar-for-hadoop.jar in the ./targe
 2. The process of building an index with Glimmer consists of the following steps.  (The build-index.sh shell script is provided to automate the process.)
 
 * Preprocess the NQuad tuples file to get:
-  - A sorted unique list of subjects with the subject's associated predicates, objects and contexts.
+  - A sorted unique list of subjects with the subject's associated predicates, objects and contexts.  BZip2'ed
+  - A file containing a mapping between the BZip2 block start offsets(in the file above) and the first subject id in that block.
   - A sorted unique list of subjects resources.
   - A sorted unique list of predicates resources.
   - A sorted unique list of all resources(Subject, Predicate, Object & Context).
@@ -45,8 +46,6 @@ This will produce a jar Glimmer-?.?.?-SNAPSHOT-jar-for-hadoop.jar in the ./targe
 * Build the 'horizontal' and 'vertical'(See the paper..) MG4J indexes.
 
 * Compute the Document sizes.
-
-* Build the MG4J document collection.
 
 * Copy all the generated files to the desired location.
 

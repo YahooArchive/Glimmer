@@ -15,6 +15,7 @@ import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -91,99 +92,135 @@ public class RDFIndexStatisticsBuilderTest {
 	assertEquals(1, stats.getRootClasses().size());
 	assertTrue(stats.getRootClasses().contains("http://schema.org/Thing"));
 	ClassStat stat = stats.getClasses().get("http://schema.org/Thing");
-	
-	//System.out.println(RDFIndexStatisticsBuilder.toString(stats));
-	
+
+	// System.out.println(RDFIndexStatisticsBuilder.toString(stats));
+
 	// Assert ontology tree is correct..
-	assertThing(stats, stat);
+	assertThing(stats, stat, "http://schema.org/description", "http://schema.org/name", "http://schema.org/url");
 
 	assertNotNull(stats.getProperties());
 	assertEquals(4, stats.getProperties().size());
-	assertEquals((Integer)20, stats.getProperties().get("http://schema.org/url"));
-	assertEquals((Integer)10, stats.getProperties().get("http://schema.org/description"));
-	assertEquals((Integer)22, stats.getProperties().get("http://schema.org/name"));
-	assertEquals((Integer)1, stats.getProperties().get("http://schema.org/awards"));
+	assertEquals((Integer) 20, stats.getProperties().get("http://schema.org/url"));
+	assertEquals((Integer) 10, stats.getProperties().get("http://schema.org/description"));
+	assertEquals((Integer) 22, stats.getProperties().get("http://schema.org/name"));
+	assertEquals((Integer) 1, stats.getProperties().get("http://schema.org/awards"));
     }
 
-    private static void assertThing(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertThing(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	assertClassStat(stat, "Thing", 152, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertCreativeWork(stats, stats.getClasses().get(ci.next()));
-	assertOrganization(stats, stats.getClasses().get(ci.next()));
-	assertPlace(stats, stats.getClasses().get(ci.next()));
+	assertCreativeWork(stats, stats.getClasses().get(ci.next()), properties);
+	assertOrganization(stats, stats.getClasses().get(ci.next()), properties);
+	assertPlace(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "Thing", 152, "http://schema.org/description", "http://schema.org/name", "http://schema.org/url");
     }
 
-    private static void assertCreativeWork(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertCreativeWork(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	properties = concat(properties, "http://schema.org/awards", "http://schema.org/contentRating", "http://schema.org/datePublished",
+		"http://schema.org/genre", "http://schema.org/headline", "http://schema.org/inLanguage", "http://schema.org/interactionCount",
+		"http://schema.org/keywords");
+	assertClassStat(stat, "CreativeWork", 23, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertArticle(stats, stats.getClasses().get(ci.next()));
+	assertArticle(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "CreativeWork", 23, "http://schema.org/awards", "http://schema.org/contentRating", "http://schema.org/datePublished",
-		"http://schema.org/genre", "http://schema.org/headline", "http://schema.org/inLanguage", "http://schema.org/interactionCount", "http://schema.org/keywords");
     }
 
-    private static void assertArticle(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertArticle(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	properties = concat(properties, "http://schema.org/articleBody", "http://schema.org/articleSection");
+	assertClassStat(stat, "Article", 3, properties);
 	assertNull(stat.getChildren());
-	assertClassStat(stat, "Article", 3, "http://schema.org/articleBody", "http://schema.org/articleSection");
     }
 
-    private static void assertOrganization(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertOrganization(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	properties = concat(properties, "http://schema.org/email", "http://schema.org/faxNumber", "http://schema.org/foundingDate",
+		"http://schema.org/interactionCount", "http://schema.org/telephone");
+	assertClassStat(stat, "Organization", 29, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertLocalBusiness(stats, stats.getClasses().get(ci.next()));
+	assertLocalBusiness(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "Organization", 29);
     }
 
-    private static void assertLocalBusiness(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertLocalBusiness(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	// Has this inherits from more than one class explicitly define the
+	// properties.
+	String[] explicitProperties = new String[] { "http://schema.org/currenciesAccepted", "http://schema.org/description", "http://schema.org/email",
+		"http://schema.org/faxNumber", "http://schema.org/foundingDate", "http://schema.org/interactionCount", "http://schema.org/maps",
+		"http://schema.org/name", "http://schema.org/paymentAccepted", "http://schema.org/priceRange", "http://schema.org/telephone",
+		"http://schema.org/url" };
+
+	assertTrue(Arrays.asList(explicitProperties).containsAll(Arrays.asList(properties)));
+	assertClassStat(stat, "LocalBusiness", 29, explicitProperties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertEntertainmentBusiness(stats, stats.getClasses().get(ci.next()));
+	assertEntertainmentBusiness(stats, stats.getClasses().get(ci.next()), explicitProperties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "LocalBusiness", 29, "http://schema.org/currenciesAccepted", "http://schema.org/paymentAccepted", "http://schema.org/priceRange");
     }
 
-    private static void assertEntertainmentBusiness(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertEntertainmentBusiness(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	assertClassStat(stat, "EntertainmentBusiness", 13, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertArtGallery(stats, stats.getClasses().get(ci.next()));
-	assertMovieTheater(stats, stats.getClasses().get(ci.next()));
+	assertArtGallery(stats, stats.getClasses().get(ci.next()), properties);
+	assertMovieTheater(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "EntertainmentBusiness", 13);
     }
 
-    private static void assertArtGallery(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertArtGallery(RDFIndexStatistics stats, ClassStat stat, String... properties) {
 	assertNull(stat.getChildren());
-	assertClassStat(stat, "ArtGallery", 5);
+	assertClassStat(stat, "ArtGallery", 5, properties);
     }
 
-    private static void assertMovieTheater(RDFIndexStatistics stats, ClassStat stat) {
+    private static void assertMovieTheater(RDFIndexStatistics stats, ClassStat stat, String... properties) {
 	assertNull(stat.getChildren());
-	assertClassStat(stat, "MovieTheater", 2);
+	// Has this inherits from more than one class explicitly define the
+	// properties.
+	String[] explicitProperties = new String[] { "http://schema.org/currenciesAccepted", "http://schema.org/description", "http://schema.org/email",
+		"http://schema.org/faxNumber", "http://schema.org/foundingDate", "http://schema.org/interactionCount", "http://schema.org/maps",
+		"http://schema.org/name", "http://schema.org/paymentAccepted", "http://schema.org/priceRange", "http://schema.org/telephone",
+		"http://schema.org/url" };
+
+	assertTrue(Arrays.asList(explicitProperties).containsAll(Arrays.asList(properties)));
+	assertClassStat(stat, "MovieTheater", 2, explicitProperties);
     }
-    
-    private static void assertPlace(RDFIndexStatistics stats, ClassStat stat) {
+
+    private static void assertPlace(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	properties = concat(properties, "http://schema.org/maps", "http://schema.org/faxNumber", "http://schema.org/interactionCount",
+		"http://schema.org/telephone");
+	assertClassStat(stat, "Place", 29, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertCivicStructure(stats, stats.getClasses().get(ci.next()));
-	assertLocalBusiness(stats, stats.getClasses().get(ci.next()));
+	assertCivicStructure(stats, stats.getClasses().get(ci.next()), properties);
+	assertLocalBusiness(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "Place", 29);
     }
-    
-    private static void assertCivicStructure(RDFIndexStatistics stats, ClassStat stat) {
+
+    private static void assertCivicStructure(RDFIndexStatistics stats, ClassStat stat, String... properties) {
+	assertClassStat(stat, "CivicStructure", 2, properties);
 	Iterator<String> ci = stat.getChildren().iterator();
-	assertMovieTheater(stats, stats.getClasses().get(ci.next()));
+	assertMovieTheater(stats, stats.getClasses().get(ci.next()), properties);
 	assertFalse(ci.hasNext());
-	assertClassStat(stat, "CivicStructure", 2);
     }
 
     private static void assertClassStat(ClassStat stat, String label, int count, String... properties) {
 	assertNotNull(stat);
 
-	//System.out.println(stat.getLabel() + ':' + stat.getCount() + '/' + stat.getInheritedCount() + " (" + count + ")");
+	// System.out.println(stat.getLabel() + ':' + stat.getCount() + '/' +
+	// stat.getInheritedCount() + " (" + count + ")");
 	assertEquals(label, stat.getLabel());
-	//assertEquals(count, stat.getCount());
+	// assertEquals(count, stat.getCount());
 	if (stat.getProperties() != null) {
 	    assertArrayEquals(properties, stat.getProperties().toArray());
 	} else {
 	    assertEquals(0, properties.length);
 	}
+    }
+
+    private static String[] concat(String[] a, String... values) {
+	String[] newA = new String[a.length + values.length];
+	for (int i = 0; i < a.length; i++) {
+	    newA[i] = a[i];
+	}
+	for (int i = 0; i < values.length; i++) {
+	    newA[a.length + i] = values[i];
+	}
+	Arrays.sort(newA);
+	return newA;
     }
 }

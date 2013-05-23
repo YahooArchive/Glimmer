@@ -1,0 +1,371 @@
+/* 
+ * Copyright (c) 2012 Yahoo! Inc. All rights reserved.
+ * 
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is 
+ *  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and limitations under the License.
+ *  See accompanying LICENSE file.
+ */
+ 
+body {
+	padding-top:15px;
+	background-color: #fafafc;
+	min-width: 980px;
+	width:expression(document.body.clientWidth < 980? "980px": "auto" );
+}
+
+#container {
+	text-align: left;
+	height: 100%;
+	margin: 0 auto -42px;
+}
+
+#footer,#footer-push {
+	height: 41px;
+	text-align: right;
+	font-size: x-small;
+	clear: both;
+	margin: auto;
+}
+
+.min-page-width {
+	max-width: 960px;
+	min-width: 960px;
+	width: 960px;
+}
+
+#mainContent {
+	margin: 0px auto !important;
+	max-width: 960px;
+	min-width: 960px;
+	font-size: 100%;
+}
+
+#mainContent a:link { /*color: #5555FF*/;
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:visited {
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:hover {
+	border-bottom: none;
+	color: #fff;
+	background-color: #5555FF;
+	text-decoration: none;
+}
+
+#mainContent blockquote {
+	padding: 0 0 0 15px;
+	margin: 10px 0 10px 15px;
+	width: auto;
+	float: right;
+}
+ 
+/* -- local specific -- */
+.context-red {
+	color: #FF0000;
+}
+
+.context-green {
+	color: #00FF00;
+}
+
+.context-blue {
+	color: #0000FF;
+}
+
+.context-yellow {
+	color: #FFFF00;
+}
+
+.context-cyan {
+	color: #00FFFF;
+}
+
+.context-purple {
+	color: #FF00FF;
+}
+
+/* -- search specific -- */
+#searchBoxes {
+	margin-top: 10px;
+	/*        max-width: 650px;
+        min-width: 650px;*/
+	float: left;
+}
+
+#statisticsBox {
+	margin-top: 10px;
+	height: 470px;
+	float: right;
+}
+
+#results-container {
+}
+
+.hidden {
+	display: none;
+}
+
+#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table {
+	margin: 10px 5px 10px 10px;
+}
+
+#search-by-class-classes-select {
+	width: 395px;
+}
+
+#search-by-class-properties {
+	margin: 5px 0px;
+}
+
+#search-by-class-properties table {
+	border: 0px;
+	margin: 0px;
+}
+
+#search-by-class-properties td {
+	padding: 5px;
+}
+
+.search-button {
+	margin-bottom: -6px;
+}
+
+table.result {
+	width: 100%;
+	margin: 0px;
+	margin-top: 3px;
+	table-layout: fixed;
+}
+
+table.result td {
+	padding-top: 5px;
+	padding-bottom: 5px;
+	overflow: hidden;
+}
+
+table.result .odd {
+	background: #FFFFFF;
+}
+
+table.result .even {
+	background: #F0F0FF;
+}
+
+.label {
+	font-size: 120%;
+}
+
+.predicate {
+	color: black;
+}
+
+.result-header {
+	background: #DDDDDD;
+}
+
+
+#statisticsTree {
+	line-height: 150%;
+	margin-top: 10px;
+	float: right;
+	width: 390px;
+	min-height: 150px;
+	max-height: 310px;
+	padding: 4px 0px;
+	overflow: auto;
+	border-left: 1px solid #ccdbe4;
+}
+
+#statisticsTree .yui3-treeview-content {
+	margin: 0px 5px;
+}
+
+#results-container table .predicate-col {
+	column-width: 100px;
+	-moz-column-width: 100px; /* Firefox */
+	-webkit-column-width: 100px; /* Safari and Chrome */
+	width: 130px;
+}
+
+#results-container table .value-col {
+	column-width: 450px;
+	-moz-column-width: 450px; /* Firefox */
+	-webkit-column-width: 450px; /* Safari and Chrome */
+}
+
+#intro {
+	position: relative;
+}
+
+#topContent {
+	z-index: 2;
+	float: left;
+	border-right: 1px solid #ccdbe4;
+	padding-right: 14px;
+	margin-right: -2px;
+}
+
+#bottom-content {
+	margin-top: 20px;
+	float: left;
+	clear: both;
+	width:960px;
+}
+
+#spacer {
+	margin-bottom: 10px;
+}
+
+#disclaimer {
+	margin: 15px auto !important;
+	padding: 10px 10px 10px 0px;
+	float: left;
+}
+
+#togglefields {
+	font-size: 12pt;
+	color: #3A4956;
+	text-decoration: underline
+}
+
+#toggleonto {
+	color: #3A4956;
+	font-family: 'Lucida Grande';
+	font-size: 11px;
+	color: #3A4956;
+	position: relative;
+	left: 190px;
+	top: -20px;
+	margin-bottom: -20px;
+}
+
+#pageHeader h1 {
+	color: #000;
+	margin: 0 0 5px 20px;
+	font-family: bold Helvetica, Arial, sans-serif;
+	letter-spacing: -1px;
+}
+
+#pageHeader a:link,#pageHeader a:hover,#pageHeader a:visited {
+	color: #fff; //
+	background-color: #3399FF;
+	text-decoration: none;
+}
+
+
+#selectionbar ul {
+	margin: 0;
+	padding: 1em 1em 0 0;
+}
+
+#selectionbar li {
+	display: inline;
+	list-style: none outside none;
+}
+
+#selectionbar a:link,#selectionbar a:visited {
+	color: #FFFFFF;
+	display: block;
+	float: right;
+	margin: 0 6px;
+	padding: 1px 9px 3px 6px;
+	text-decoration: none;
+}
+
+#selectionbar a:hover {
+	background-color: transparent;
+	color: #FFEE99;
+}
+
+#selectionbar .activelink a {
+	background: none repeat scroll 0 0 #3399FF;
+}
+
+#selectionbar .activelink a:hover {
+	background-color: #3399FF;
+	color: #FFFFFF;
+	cursor: default;
+}
+
+.doc-link {
+	color: #3A4956;
+	text-decoration: none;
+	margin-left: 10px;
+}
+
+.doc-link:hover {
+	border-bottom: none;
+	color: #fff;
+	background-color: #5555FF;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+#ac-input {
+	width: 500px;
+	margin-top: 10px;
+}
+
+#disclaimer {
+	width: 960px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+#statistics-loader {
+	padding: 6px;
+}
+
+.status {
+	border-top: 1px solid #ccdbe4;
+	height: 30px;
+}
+
+#result-stats {
+	float: left;
+}
+
+#results {
+	clear: both;
+}
+
+#results ol {
+	list-style: decimal inside;
+	margin:0px;
+}
+#results li {
+	padding-bottom:10px;
+}
+
+.results-pager {
+	clear: both;
+	text-align: center;
+	margin-bottom: 10px;
+}
+
+.results-pager .pager-link {
+	border: 1px solid #ccdbe4;
+	margin: 0 2px;
+	padding: 1px 3px;
+	display: inline-block;
+}
+
+.results-pager .pager-link-current {
+	border: 0;
+	color: #000;
+	font-size: 108%;
+	font-weight: bold;
+	padding: 1px 6px;
+}
+
+#results-pager-top-status {
+	float: right;
+}

@@ -49,6 +49,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 					    // used.
 
     public static final String INCLUDE_CONTEXTS_KEY = "includeContexts";
+    public static final String EXTRA_RESOURCES = "extraResources";
 
     enum Counters {
 	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
@@ -62,6 +63,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     private StringBuilder predicateObjectContextDot = new StringBuilder();
     private Tuple tuple = new Tuple();
     private TupleFilter filter;
+    private String[] extraResources;
 
     private InputSplit lastInputSplit;
 
@@ -81,6 +83,8 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	} else {
 	    LOG.info("No TupleFilter given. Processing all tuples.");
 	}
+	
+	extraResources = conf.getStrings(EXTRA_RESOURCES);
     };
 
     public void setIncludeContexts(boolean includeContexts) {
@@ -91,6 +95,17 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException,
 	    InterruptedException {
 
+	if (extraResources != null) {
+	    // Add extra resources.
+	    // These end up in the 'all' resources file so get given a Doc ID
+	    // even if they don't occur in the data.
+
+	    for (String extraResource : extraResources) {
+		context.write(new Text(extraResource), new Text(""));
+	    }
+
+	    extraResources = null;
+	}
 	if (!context.getInputSplit().equals(lastInputSplit)) {
 	    lastInputSplit = context.getInputSplit();
 	    if (lastInputSplit instanceof FileSplit) {

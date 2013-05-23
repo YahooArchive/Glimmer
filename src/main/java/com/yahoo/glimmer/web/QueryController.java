@@ -49,12 +49,13 @@ public class QueryController {
     
     private static final String DOC_PSEUDO_FIELD = "doc:";
     // This defines how resources are written in the command objects query string.
-    private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+|_:[A-Za-z][A-Za-z0-9]*)>)");
+    private static final Pattern RESOURCE_PATTERN = Pattern.compile("(\\{(?:https?://[^}]+|_:[A-Za-z][A-Za-z0-9]*)\\})");
 
     private static final Integer DEFAULT_OBJECT_LENGTH_LIMIT = 300;
 
     private IndexMap indexMap;
     private Querier querier;
+    private QueryFilter queryFilter;
     
     private Integer defaultObjectLengthLimit = DEFAULT_OBJECT_LENGTH_LIMIT;
 
@@ -88,23 +89,28 @@ public class QueryController {
 	return Collections.singletonMap(OBJECT_KEY, statistics);
     }
 
-    @RequestMapping(value = "/query", method = RequestMethod.GET)
-    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command) throws QueryParserException,
+    @RequestMapping(value = {"/query", "/v1/search"} , method = RequestMethod.GET)
+    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command, HttpServletRequest httpServletRequest) throws QueryParserException,
 	    QueryBuilderVisitorException, IOException {
 	if (index == null) {
-	    throw new HttpMessageConversionException("No index given");
+	    throw new HttpMessageConversionException("No index given.");
 	}
 
 	String query = command.getQuery();
 	if (query == null || query.isEmpty()) {
-	    throw new HttpMessageConversionException("No query given");
+	    throw new HttpMessageConversionException("No query given.");
+	}
+	
+	RDFQueryResult result;
+	if (queryFilter != null && queryFilter.filter(query)) {
+	    LOGGER.info("Blocking query:" + query + " from address:" + httpServletRequest.getRemoteAddr());
+	    throw new HttpMessageConversionException("Bad query given.");
 	}
 
 	query = decodeEntities(command.getQuery()).trim();
 	query = encodeResources(index, query);
 	
 	Query parsedQuery;
-	RDFQueryResult result;
 	switch (command.getType()) {
 	case MG4J:
 	    parsedQuery = new SimpleParser().parse(query);
@@ -126,7 +132,7 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
+		result = querier.doQueryForDocId(index, id, command.isDeref(), null);
 	    } else {
 		try {
 		    parsedQuery = index.getParser().parse(query);
@@ -145,7 +151,9 @@ public class QueryController {
 
     @ExceptionHandler(Exception.class)
     public Map<String, ?> handleException(Exception ex,  HttpServletRequest request, HttpServletResponse response) {
-	LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
+	if (!(ex instanceof HttpMessageConversionException)) {
+	    LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
+	}
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }
@@ -162,7 +170,7 @@ public class QueryController {
     }
     
     /**
-     * Replaces '<' + resource + '>' strings with '@' + resourceId.
+     * Replaces '{' + resourceString + '}' with '@' + resourceId.
      * 
      * @param index
      * @param query
@@ -174,12 +182,17 @@ public class QueryController {
 	StringBuffer sb = new StringBuffer();
 	while (resourceMatcher.find()) {
 	    String resource = resourceMatcher.group(0);
-	    // Remove < and >
+	    // Remove { and }
 	    resource = resource.substring(1, resource.length() - 1);
 	    
+	    // TODO. Objects that are Resources aren't converted to lower case during indexing but predicates are!
+	    // (in PredicatePrefixTupleFilter)  Needs to be consistent.
 	    String resourceId = index.lookupIdByResourceId(resource);
 	    if (resourceId == null) {
-		throw new IllegalArgumentException("The resource " + resource + " isn't in the data set.");
+		resourceId = index.lookupIdByResourceId(resource.toLowerCase());
+		if (resourceId == null) {
+		    throw new IllegalArgumentException("The resource " + resource + " isn't in the data set.");
+		}
 	    }
 	    resourceMatcher.appendReplacement(sb, resourceId);
 	 }
@@ -196,6 +209,11 @@ public class QueryController {
     @Resource
     public void setIndexMap(IndexMap indexMap) {
 	this.indexMap = indexMap;
+    }
+    
+    @Resource
+    public void setQueryFilter(QueryFilter queryFilter) {
+	this.queryFilter = queryFilter;
     }
     
     public void setDefaultObjectLengthLimit(Integer defaultObjectLengthLimit) {

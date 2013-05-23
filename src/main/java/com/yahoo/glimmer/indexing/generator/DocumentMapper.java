@@ -31,7 +31,7 @@ import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValue> {
     private static final Log LOG = LogFactory.getLog(DocumentMapper.class);
-    
+
     public static final int ALIGNMENT_INDEX = -1; // special index for
 						  // alignments
 
@@ -42,8 +42,7 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
     private String[] fields;
     private RDFDocument doc;
 
-    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, TermKey, TermValue>.Context context) throws IOException,
-	    InterruptedException {
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, TermKey, TermValue>.Context context) throws IOException, InterruptedException {
 	Configuration conf = context.getConfiguration();
 	fields = RDFDocumentFactory.getFieldsFromConf(conf);
 	doc = RDFDocumentFactory.buildFactory(conf).getDocument();
@@ -52,14 +51,14 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
     @Override
     public void map(LongWritable key, Text record, Context context) throws IOException, InterruptedException {
 	doc.setContent(record.getBytes(), record.getLength());
-	
+
 	if (doc == null || doc.getSubject() == null) {
 	    // Failed parsing
 	    context.getCounter(Counters.FAILED_PARSING).increment(1);
 	    LOG.error("Document failed parsing");
 	    return;
 	}
-	
+
 	if (doc.getId() < 0) {
 	    throw new IllegalStateException("Negative docId:" + doc.getId() + " subject:" + doc.getSubject());
 	}
@@ -70,12 +69,12 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 
 	// Iterate over all indices
 	for (int indexId = 0; indexId < fields.length; indexId++) {
-	    TermValue indexIdValue = new TermValue(Type.INDEX_ID, indexId);
-
 	    String fieldName = fields[indexId];
 	    if (fieldName.startsWith("NOINDEX")) {
 		continue;
 	    }
+
+	    TermValue indexIdValue = new TermValue(Type.INDEX_ID, indexId);
 
 	    // Iterate in parallel over the words of the indices
 	    MutableString term = new MutableString("");
@@ -85,7 +84,7 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 
 	    while (termReader.next(term, nonWord)) {
 		// Read next property as well
-		if (term != null) {
+		if (term != null && term.length() > 0) {
 		    String termString = term.toString();
 
 		    // Report progress
@@ -103,9 +102,9 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 			    // index) the first time we encounter a term.
 			    // The 'Alignment Index' is an index without counts
 			    // or positions. It's used for query optimization in
-			    // the query parse. The resulting 'alignment index'
+			    // the query parser. The resulting 'alignment index'
 			    // is basically used as a map from term to
-			    // predicates that term occures in.
+			    // predicates that the term occurs in.
 			    context.write(new TermKey(termString, ALIGNMENT_INDEX, indexIdValue), indexIdValue);
 			}
 			docStat = new DocStat();
@@ -124,9 +123,14 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 		}
 	    }
 
+	    if (doc.getIndexType() == RDFDocumentFactory.IndexType.HORIZONTAL && position > 0) {
+		TermValue docSizeValue = new TermValue(Type.DOC_SIZE, doc.getId(), position);
+		context.write(new TermKey(TermKey.DOC_SIZE_TERM, indexId, docSizeValue), docSizeValue);
+	    }
+
 	    for (String termString : termToDocStatMap.keySet()) {
 		DocStat docStat = termToDocStatMap.get(termString);
-		TermValue occurrenceCountValue = new TermValue(Type.DOC_STATS, docStat.count, docStat.last);
+		TermValue occurrenceCountValue = new TermValue(Type.TERM_STATS, docStat.count, docStat.last);
 		context.write(new TermKey(termString, indexId, occurrenceCountValue), occurrenceCountValue);
 	    }
 	    termToDocStatMap.clear();
@@ -134,22 +138,25 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
     }
-    
+
     private static class DocStat {
 	int last;
 	int count;
     }
-    
+
     // For testing
     String[] getFields() {
 	return fields;
     }
+
     void setFields(String[] fields) {
 	this.fields = fields;
     }
+
     RDFDocument getDoc() {
 	return doc;
     }
+
     void setDoc(RDFDocument doc) {
 	this.doc = doc;
     }

@@ -34,6 +34,8 @@ if [ ! -z ${4} ] ; then
 	SUBINDICES=${4}
 fi
 
+# The ontology file to pass to PrepTool and TripleIndexGenerator
+ONTOLOGY="schemaDotOrg.owl"
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
@@ -67,7 +69,6 @@ echo "and writing output to local disk in ${LOCAL_BUILD_DIR}."
 echo
 
 JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
-HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
 COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.GzipCodec,${COMPRESSION_CODEC}"
@@ -172,6 +173,10 @@ function groupBySubject () {
 	if [ ! -z ${PREP_FILTER_FILE} ] ; then
 		HADOOP_FILES="-files ${PREP_FILTER_FILE}#FilterXml"
 	fi
+	ONTOLOGY_OPTION=""
+	if [ ! -z ${ONTOLOGY} ] ; then
+		ONTOLOGY_OPTION="-O ${ONTOLOGY}"
+	fi
 	
 	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -183,6 +188,7 @@ function groupBySubject () {
 		-Dmapreduce.output.fileoutputformat.compress=false \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		${HADOOP_FILES} \
+		${ONTOLOGY_OPTION} \
 		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
@@ -192,11 +198,15 @@ function groupBySubject () {
 		echo "PrepTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
-	
+}
+
+function moveBySubjectFiles() {
+	local PREP_DIR=${1}
 	local CMD="${HADOOP_CMD} fs -mv ${PREP_DIR}/part-r-00000/* ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
 	
+	echo "Getting ${N_VERTICAL_PREDICATES} most used predicates in topPredicates."
 	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 > ${LOCAL_BUILD_DIR}/allPredicates
 	head -${N_VERTICAL_PREDICATES} ${LOCAL_BUILD_DIR}/allPredicates > ${LOCAL_BUILD_DIR}/topPredicates
 	${HADOOP_CMD} fs -put ${LOCAL_BUILD_DIR}/topPredicates ${PREP_DIR}
@@ -268,6 +278,11 @@ function generateIndex () {
 		${HADOOP_CMD} fs -rmr -skipTrash ${METHOD_DIR}
 	fi
 	
+	HADOOP_FILES=""
+	if [ ! -z ${ONTOLOGY} ] ; then
+		HADOOP_FILES="-files ${ONTOLOGY}#Ontology"
+	fi
+	
 	echo Generating index..
 	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -280,8 +295,9 @@ function generateIndex () {
 		-Dmapreduce.task.io.sort.mb=128 \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-Dmapreduce.job.user.classpath.first=true \
-		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
+		${HADOOP_FILES} \
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates \
+		${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 
@@ -344,6 +360,12 @@ function mergeSubIndexes() {
 		done
 	fi
 	
+	# The first reducer write the sizes files for all partitions so we don't need to merge them
+	# Move the .sizes files to the correct location before running the merge. Otherwise Merge
+	# finds .sizes for only the first partition.
+	echo "Moving .sizes files.."
+	mv -v ${INDEX_DIR}/part-r-00000/*.sizes ${INDEX_DIR}
+	
 	PART_DIRS=(`ls -1d ${INDEX_DIR}/part-r-?????`)
 	echo "Map Reduce part dirs are:"
 	echo ${PART_DIRS[@]}
@@ -380,7 +402,7 @@ function mergeSubIndexes() {
 		for PART_DIR in ${PART_DIRS[@]}; do
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
-		
+
 		CMD="java -Xmx3800m -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap \
 			-o ${INDEX_DIR}/${INDEX_NAME}.terms \
 			${INDEX_DIR}/${INDEX_NAME}.termmap \
@@ -397,49 +419,13 @@ function mergeSubIndexes() {
 	rm -rf ${INDEX_DIR}/part-r-?????
 }
 
-	
-function generateDocSizes () {
-	PREP_DIR=${1}
-	METHOD=horizontal
-	NUMBER_OF_DOCS=${2}
-	NUM_INDEXES=5
-	
-	echo
-	echo GENERATING DOC SIZES..
-	echo
-	
-	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
-	
-	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.DocSizesGenerator \
-		-Dmapreduce.map.failures.maxpercent=1 \
-		-Dmapreduce.map.speculative=false \
-		-Dmapred.map.child.java.opts=-Xmx3000m \
-		-Dmapreduce.map.memory.mb=3000 \
-		-Dmapred.reduce.child.java.opts=-Xmx1800m \
-		-Dmapreduce.reduce.memory.mb=1800 \
-		-Dmapreduce.job.reduces=${NUM_INDEXES} \
-		-Dmapreduce.job.queuename=${QUEUE} \
-		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
-	echo ${CMD}
-	${CMD}
-	EXIT_CODE=$?
-	
-	${HADOOP_CMD} fs -rmr -skipTrash "${DFS_SIZES_DIR}/*-temp"
-	
-	if [ $EXIT_CODE -ne 0 ] ; then
-		echo "DocSizesGenerator failed with value of $EXIT_CODE. exiting.."
-		exit $EXIT_CODE
-	fi
-	
-	${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
-}	
-
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep
+moveBySubjectFiles ${DFS_BUILD_DIR}/prep
 computeHashes ${DFS_BUILD_DIR}/prep/all
 
 getDocCount ${DFS_BUILD_DIR}/prep
 
+# Horizontal and Vertical index builds could be run in parallel..
 generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes horizontal
 mergeSubIndexes horizontal
@@ -447,9 +433,6 @@ mergeSubIndexes horizontal
 generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes vertical
 mergeSubIndexes vertical
-
-# These could be run in parallel with index generation.
-generateDocSizes ${DFS_BUILD_DIR}/prep ${NUMBER_OF_DOCS}
 
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.map" "${LOCAL_BUILD_DIR}"

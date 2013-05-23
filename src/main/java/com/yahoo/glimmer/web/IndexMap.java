@@ -42,8 +42,9 @@ public class IndexMap extends HashMap<String, RDFIndex> {
 	File multiIndexPath = context.getMultiIndexPath();
 	if (multiIndexPath == null) {
 	    // Single index, index.path property must be present
-	    RDFIndex index = new RDFIndex(context);
-	    put(context.getKbRootPath().getName(), index);
+	    String indexName = context.getKbRootPath().getName();
+	    RDFIndex index = new RDFIndex(indexName, context);
+	    put(indexName, index);
 	} else {
 	    // Multiple indices under a root directory
 	    // In this case the config file is a template that we copy and configure for
@@ -61,7 +62,7 @@ public class IndexMap extends HashMap<String, RDFIndex> {
 		    String indexName = filename.substring(multiIndexDirPrefix.length());
 		    Context contextCopy = new Context(context);
 		    contextCopy.setKbRootPath(file);
-		    RDFIndex index = new RDFIndex(contextCopy);
+		    RDFIndex index = new RDFIndex(indexName, contextCopy);
 		    put(indexName, index);
 		}
 	    }

@@ -56,10 +56,10 @@ public class TermKeyTest {
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 7l, 67))) < 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6l, 67))) > 0);
 	
-	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67))) > 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.TERM_STATS, 6, 67))) > 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))) > 0);
 	
-	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))) < 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.TERM_STATS, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))) < 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67))) < 0);
 	
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 3, new TermValue(Type.OCCURRENCE, 6, 67))) > 0);
@@ -83,10 +83,10 @@ public class TermKeyTest {
 	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 5, 67))));
 	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 7, 67))));
 	
-	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67))));
+	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.TERM_STATS, 6, 67))));
 	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))));
 	
-	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))));
+	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.TERM_STATS, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))));
 	assertEquals(0, compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67))));
 	
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 3, new TermValue(Type.OCCURRENCE, 6, 67))) > 0);

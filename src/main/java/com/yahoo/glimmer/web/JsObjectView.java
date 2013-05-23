@@ -58,7 +58,7 @@ public class JsObjectView implements View {
     @Override
     public String getContentType() {
 	// Setting charset= means that response.getWriter() will return a Writer that writes in that charset.
-	return "text/javascript; charset=UTF-8";
+	return "application/json; charset=UTF-8";
     }
 
     @Override

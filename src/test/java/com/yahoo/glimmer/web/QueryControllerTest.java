@@ -40,11 +40,11 @@ public class QueryControllerTest {
 	assertEquals("type:not_a_resource", QueryController.encodeResources(index, query));
 	query = "http://schema.org/Blog";
 	assertEquals("http://schema.org/Blog", QueryController.encodeResources(index, query));
-	query = "type:<https://somesite/path?p1=a&p2=b>";
+	query = "type:{https://somesite/path?p1=a&p2=b}";
 	assertEquals("type:@22", QueryController.encodeResources(index, query));
-	query = "type:<_:node1234>";
+	query = "type:{_:node1234}";
 	assertEquals("type:@333", QueryController.encodeResources(index, query));
-	query = "type:<http://schema.org/Blog> <_:node1234>";
+	query = "type:{http://schema.org/Blog} {_:node1234}";
 	assertEquals("type:@1 @333", QueryController.encodeResources(index, query));
     }
 }

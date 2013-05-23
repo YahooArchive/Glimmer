@@ -8,239 +8,6 @@
  *  See the License for the specific language governing permissions and limitations under the License.
  *  See accompanying LICENSE file.
  */
-/* -- header/title -- */
-#container {
-	width: 100%;
-	text-align: left;
-	margin: 0;
-	min-height: 100%;
-	height: auto !important;
-	height: 100%;
-	margin: 0 auto -20px; 
-}
-
-#intro {
-	position: relative;
-}
-
-#mainContent { /*margin: 15px 50px 15px 50px; */
-	margin: 15px auto !important;
-	max-width: 960px;
-	min-width: 350px;
-}
-
-#topContent {
-	padding: 8px;
-	z-index: 2;
-	float: left;
-}
-
-#bottomContent {
-	padding: 10px;
-	margin-top: 10px;
-	/*	max-width: 650px;
-	min-width: 650px; */
-	float: left;
-}
-
-#spacer {
-	margin-bottom: 10px;
-}
-
-#disclaimer {
-	margin: 15px auto !important;
-	padding: 10px 10px 10px 0px;
-	float: left;
-}
-
-#footer, #footer-push {
-	padding: 0 10px;
-	height: 20px;
-	text-align: right;
-	font-size: x-small;
-	clear:both;
-}
-
-#pageHeader h1 {
-	max-width: 960px;
-	min-width: 350px;
-	margin: 0 auto !important;
-	padding: 0 40px;
-	position: relative;
-	top: 25px;
-	left: -40px;
-	text-shadow: 0 2px 0 #510000;
-}
-
-#togglefields {
-	font-size: 12pt;
-	color: #3A4956;
-	text-decoration: underline
-}
-
-#toggleonto {
-	color: #3A4956;
-	font-family: 'Lucida Grande';
-	font-size: 11px;
-	color: #3A4956;
-	position: relative;
-	left: 190px;
-	top: -20px;
-	margin-bottom: -20px;
-}
-
-#pageHeader {
-	width: 100%;
-	height: 50px;
-	background: #990000;;
-}
-
-#pageHeader h1 {
-	color: #fff;
-	margin: 0 0 5px 20px;
-	font-family: bold Helvetica, Arial, sans-serif;
-	letter-spacing: -1px;
-}
-
-#pageHeader a:link,#pageHeader a:hover,#pageHeader a:visited {
-	color: #fff; //
-	background-color: #3399FF;
-	text-decoration: none;
-}
-
-#selectionbar {
-	background: none repeat scroll 0 #660000;
-	color: #FFFFFF;
-	font-size: 90%;
-	height: 30px;
-}
-
-#selectionbar ul {
-	margin: 0;
-	padding: 1em 1em 0 0;
-}
-
-#selectionbar li {
-	display: inline;
-	list-style: none outside none;
-}
-
-#selectionbar a:link,#selectionbar a:visited {
-	color: #FFFFFF;
-	display: block;
-	float: right;
-	margin: 0 6px;
-	padding: 1px 9px 3px 6px;
-	text-decoration: none;
-}
-
-#selectionbar a:hover {
-	background-color: transparent;
-	color: #FFEE99;
-}
-
-#selectionbar .activelink a {
-	background: none repeat scroll 0 0 #3399FF;
-}
-
-#selectionbar .activelink a:hover {
-	background-color: #3399FF;
-	color: #FFFFFF;
-	cursor: default;
-}
-
-.doc-link {
-	color: #3A4956;
-	text-decoration: none;
-	margin-left: 10px;
-}
-
-.doc-link:hover {
-	border-bottom: none;
-	color: #fff;
-	background-color: #5555FF;
-	text-decoration: none;
-	cursor: pointer;
-}
-
-/* -- main content -- */
-#mainContent {
-	font-size: 100%;
-}
-
-#ac-input {
-	width: 500px;
-}
-
-#disclaimer {
-	width: 960px;
-	margin-left: auto;
-	margin-right: auto;
-}
-
-#mainContent a:link { /*color: #5555FF*/;
-	color: #3A4956;
-	text-decoration: none;
-}
-
-#mainContent a:visited {
-	color: #3A4956;
-	text-decoration: none;
-}
-
-#mainContent a:hover {
-	border-bottom: none;
-	color: #fff;
-	background-color: #5555FF;
-	text-decoration: none;
-}
-
-#mainContent blockquote {
-	padding: 0 0 0 15px;
-	margin: 10px 0 10px 15px;
-	width: auto;
-	float: right;
-}
-
-#statistics-loader {
-	padding: 6px;
-}
-
-.status {
-	clear:both;
-	text-align: center;
-	padding-right: 4px;
-	padding-left: 4px;
-}
-#result-stats {
-	float:left;
-}
-
-#results {
-	clear: both;
-}
-#results ol{
-	list-style: decimal inside;
-	margin-left: 1em;
-}
-
-.results-pager {
-}
-.results-pager .pager-link {
-	padding: 2px;
-}
-.results-pager .pager-link-current {
-	background-color: #E4F2FF;
-}
-#results-pager-top-status {
-	float: right;
-}
-#results-pager-top {
-	clear:both;
-	float:right;
-}
-#results-pager-bottom {
-}
 
 /* -- general -- */
 body {
@@ -252,7 +19,6 @@ body {
 	margin: 0;
 	padding: 0;
 	text-align: center;
-	height: 100%;
 }
 
 code {
@@ -267,11 +33,11 @@ h1,.title {
 }
 
 h2 {
-	border-top: 1px solid #990000;
+	border-top: 1px solid #ccdbe4;
 	padding-top: 5px;
 	clear: both;
 	font: normal 18px Helvetica, Arial, sans-serif;
-	margin: 2em 0 0 0;
+	margin: 10px 0 0 0;
 }
 
 h3 {
@@ -309,7 +75,7 @@ table {
 	border: 1px solid #98A0A6;
 }
 
-th,.prop-nam {
+th {
 	text-align: left;
 	background: #C7CBCE;
 	padding-left: 5px;
@@ -371,3 +137,4 @@ blockquote {
 	word-wrap: break-word;
 	width: 800px;
 }
+

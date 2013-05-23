@@ -103,4 +103,10 @@ public class UtilTest {
 	assertEquals("articleBody", shortNames.get(0));
 	assertEquals("ArticleBody", shortNames.get(1));
     }
+    
+    //TODO
+    //@Test
+    public void removeVersionTest() {
+	assertEquals("path", Util.removeVersion(""));
+    }
 }

@@ -28,6 +28,8 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
  * 
  */
 public class TermKey implements WritableComparable<TermKey> {
+    // The term is set to this when the values Type is DOC_SIZE.
+    public static final String DOC_SIZE_TERM = "";
     private int index;
     private String term;
     // We want hadoop to sort our values too. So the initial sort includes the

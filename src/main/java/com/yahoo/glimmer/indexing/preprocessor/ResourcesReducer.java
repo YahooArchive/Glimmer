@@ -39,7 +39,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     private long docId;
     
     static enum Counters {
-	TOO_MANY_RELATIONS;
+	TOO_MANY_RELATIONS, DUPLICATE_RELATIONS;
     }
     
     private final static Text SUBJECT_TEXT = new Text(TupleElementName.SUBJECT.name());
@@ -52,6 +52,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	int keyObjectCount = 0;
 	int keyContextCount = 0;
 	int relationsCount = 0;
+	int duplicateRelatations = 0;
 	
 	outputCount.output = OUTPUT.ALL;
 	outputCount.count = 0;
@@ -59,6 +60,8 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	
 	bySubjectRecord.clearRelations();
 
+	String lastValue = null;
+	
 	for (Text value : values) {
 	    if (PREDICATE_TEXT.equals(value)) {
 		keyPredicateCount++;
@@ -68,13 +71,23 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 		keyContextCount++;
 	    } else if (SUBJECT_TEXT.equals(value)) {
 		throw new IllegalArgumentException("Reducer got a SUBJECT value!?.  Should only be \"PREDICATE\", \"OBJECT\", \"CONTEXT\" or a relation String.");
-	    } else {
-		bySubjectRecord.addRelation(value.toString());
-		relationsCount++;
+	    } else if (value.getLength() > 0) {
+		String valueString = value.toString();
+		if (!valueString.equals(lastValue)) {
+		    bySubjectRecord.addRelation(valueString);
+		    relationsCount++;
+		    lastValue = valueString;
+		} else {
+		    duplicateRelatations++;
+		}
 	    }
 	}
 	
 	if (relationsCount > 0) {
+	    if (duplicateRelatations > 0) {
+		context.getCounter(Counters.DUPLICATE_RELATIONS).increment(duplicateRelatations);
+	    }
+	    
 	    // The docId's should match with OUTPUT.ALL hash values
 	    bySubjectRecord.setId(docId);
 	    bySubjectRecord.setSubject(key.toString());

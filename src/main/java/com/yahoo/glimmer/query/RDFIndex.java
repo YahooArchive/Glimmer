@@ -67,6 +67,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
@@ -74,7 +75,6 @@ import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
-    private final static String TYPE_INDEX = "http_www_w3_org_1999_02_22_rdf_syntax_ns_type";
     public final static int MAX_STEMMING = 1024;
 
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
@@ -88,6 +88,7 @@ public class RDFIndex {
     private static final String[] HORIZONTAL_INDECIES = new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY, CONTEXT_INDEX_KEY};
     private static final String[] MANDITORY_HORIZONTAL_INDECIES = new String[] {PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY};
 
+    private final String indexName;
     /** The query engine. */
     private QueryEngine queryEngine;
     /** The document collection. */
@@ -126,7 +127,9 @@ public class RDFIndex {
 	}
     }
 
-    public RDFIndex(Context context) throws RDFIndexException {
+    public RDFIndex(String indexName, Context context) throws RDFIndexException {
+	this.indexName = indexName;
+	
 	File kbRootPath = context.getKbRootPath();
 	if (kbRootPath == null) {
 	    throw new IllegalArgumentException("path to knowledge base root is not set.");
@@ -154,7 +157,7 @@ public class RDFIndex {
 	// Load the collection or titlelist
 	String indexBasename = new File(kbRootPath, "bySubject").getAbsolutePath();
 	try {
-	    BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", new IdentityDocumentFactory(), 10000);
+	    BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", new IdentityDocumentFactory(), 100000);
 	    collection.filename(indexBasename);
 	    documentCollection = collection;
 	} catch (IOException e) {
@@ -249,7 +252,7 @@ public class RDFIndex {
 
 	try {
 	    predicateDistribution = Collections.unmodifiableMap(getTermDistribution(indexMap.get(PREDICATE_INDEX_KEY), true));
-	    Index typeField = indexMap.get(TYPE_INDEX);
+	    Index typeField = indexMap.get(Util.encodeFieldName(RDF.TYPE.toString()));
 	    if (typeField == null) {
 		typeTermDistribution = Collections.emptyMap();
 	    } else {
@@ -335,6 +338,10 @@ public class RDFIndex {
 	    termProcessors.put(alias, getField(alias).termProcessor);
 	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, OBJECT_INDEX_KEY,
 		termProcessors, allResourcesToIds);
+    }
+    
+    public String getIndexName() {
+	return indexName;
     }
 
     private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {

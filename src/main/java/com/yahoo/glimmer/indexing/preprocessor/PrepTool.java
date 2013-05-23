@@ -11,6 +11,10 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -21,16 +25,21 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.semanticweb.owlapi.model.OWLClass;
+import org.semanticweb.owlapi.model.OWLOntology;
 
+import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
+import com.yahoo.glimmer.indexing.OntologyLoader;
 
 public class PrepTool extends Configured implements Tool {
     public static final String NO_CONTEXTS_ARG = "excludeContexts";
+    private static final String ONTOLOGY_ARG = "ontology";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
 
@@ -44,9 +53,9 @@ public class PrepTool extends Configured implements Tool {
 
 	SimpleJSAP jsap = new SimpleJSAP(PrepTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
 		new Switch(NO_CONTEXTS_ARG, 'C', NO_CONTEXTS_ARG, "Don't process the contexts for each tuple."),
+		new FlaggedOption(ONTOLOGY_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'O', ONTOLOGY_ARG),
 		new UnflaggedOption(INPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."),
-
 	});
 
 	JSAPResult jsapResult = jsap.parse(args);
@@ -60,6 +69,24 @@ public class PrepTool extends Configured implements Tool {
 	
 	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
 	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
+	
+	// The ontology if any...
+	String ontologyFilename = jsapResult.getString(ONTOLOGY_ARG);
+	if (ontologyFilename != null) {
+	    // Load the ontology
+	    InputStream ontologyInputStream = new FileInputStream(ontologyFilename);
+	    OWLOntology ontology = OntologyLoader.load(ontologyInputStream);
+	    System.out.println("Loaded ontology from " + ontologyFilename + " with " + ontology.getAxiomCount() + " axioms.");
+	    
+	    ArrayList<String> ontologyClasses = new ArrayList<String>();
+	    for (OWLClass owlClass : ontology.getClassesInSignature()) {
+		ontologyClasses.add(owlClass.getIRI().toString());
+	    }
+	    System.out.println("Adding " + ontologyClasses.size() + " classes from ontology.");
+	    config.setStrings(TuplesToResourcesMapper.EXTRA_RESOURCES, ontologyClasses.toArray(new String[0]));
+	} else {
+	    System.out.println("No ontology filename set in conf.  No ontology has been loaded.");
+	}
 
 	Job job = Job.getInstance(config);
 	job.setJarByClass(PrepTool.class);
@@ -83,6 +110,7 @@ public class PrepTool extends Configured implements Tool {
 
 	Path outputDir = new Path(jsapResult.getString(OUTPUT_ARG));
 	FileOutputFormat.setOutputPath(job, outputDir);
+	
 
 	if (!job.waitForCompletion(true)) {
 	    System.err.println("Failed to process tuples from " + jsapResult.getString(INPUT_ARG));

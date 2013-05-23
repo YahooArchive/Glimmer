@@ -89,6 +89,7 @@ public class IndexRecordWriterTest {
 	IntWritable key = new IntWritable();
 	IndexRecordWriterTermValue termValue = new IndexRecordWriterTermValue();
 	IndexRecordWriterDocValue docValue = new IndexRecordWriterDocValue();
+	IndexRecordWriterSizeValue sizeValue = new IndexRecordWriterSizeValue();
 	
 	// ALIGNEMENT_INDEX
 	key.set(DocumentMapper.ALIGNMENT_INDEX);
@@ -190,14 +191,37 @@ public class IndexRecordWriterTest {
 	docValue.addOccurrence(11);
 	recordWriter.write(key, docValue);
 	
-	recordWriter.close(taskContext);
+	// Doc Sizes.
+	key.set(0);
+	sizeValue.setDocument(0);
+	sizeValue.setSize(3);
+	recordWriter.write(key, sizeValue);
+	sizeValue.setDocument(3);
+	sizeValue.setSize(1);
+	recordWriter.write(key, sizeValue);
+	sizeValue.setDocument(4);
+	sizeValue.setSize(10);
+	recordWriter.write(key, sizeValue);
+	sizeValue.setDocument(6);
+	sizeValue.setSize(2);
+	recordWriter.write(key, sizeValue);
+	
+	key.set(1);
+	sizeValue.setDocument(3);
+	sizeValue.setSize(3);
+	recordWriter.write(key, sizeValue);
+	sizeValue.setDocument(6);
+	sizeValue.setSize(5);
+	recordWriter.write(key, sizeValue);
 
+	recordWriter.close(taskContext);
+	
 	// Check the written indexes..
 	
 	Path workPath = outputFormat.getDefaultWorkFile(taskContext,"");
 	System.out.println("Default work file is " + workPath.toString());
 	String dir = workPath.toUri().getPath();
-	BitStreamIndex index0 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index0", true);
+	BitStreamIndex index0 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index0", true, true);
 	assertEquals(8, index0.numberOfDocuments);
 	assertEquals(2, index0.numberOfTerms);
 	assertTrue(index0.hasPositions);
@@ -205,8 +229,9 @@ public class IndexRecordWriterTest {
 	checkOccurrences(index0.documents(0), 3, "(3:11,15) (4:12) (7:14,17,18)");
 	// term2
 	checkOccurrences(index0.documents(1), 2, "(1:10,19) (7:13,16)");
+	assertEquals("[3, 0, 0, 1, 10, 0, 2, 0]", index0.sizes.toString());
 
-	BitStreamIndex index1 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index1", true);
+	BitStreamIndex index1 = (BitStreamIndex) DiskBasedIndex.getInstance(dir + "/index1", true, true);
 	assertEquals(8, index1.numberOfDocuments);
 	assertEquals(2, index1.numberOfTerms);
 	assertTrue(index0.hasPositions);
@@ -224,6 +249,7 @@ public class IndexRecordWriterTest {
 	assertEquals(2, indexAlignment.documents(1).frequency());
 	// term3
 	assertEquals(1, indexAlignment.documents(2).frequency());
+	assertEquals("[0, 0, 0, 3, 0, 0, 5, 0]", index1.sizes.toString());
     }
 
     private void checkOccurrences(IndexIterator documents, int frequencey, String expected) throws IOException {

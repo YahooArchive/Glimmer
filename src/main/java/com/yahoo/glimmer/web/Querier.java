@@ -23,10 +23,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
@@ -46,13 +48,25 @@ public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
     private static final String DEFAULT_CONTEXT = "default:";
     private static final int CACHE_SIZE = 10000;
+    private static final int BIG_RESULTS_LIMIT = 100000;
 
+    private final Map<Integer, ResultsCacheValue> queryHashToResultsCache;
     private final Map<String, Long> objectsSubjectsIdCache;
     private final Map<Long, String> objectLabelCache;
 
     private QueryLogger queryLogger = new QueryLogger();
 
     public Querier() {
+	Map<Integer, ResultsCacheValue> resultsCache = new LinkedHashMap<Integer, ResultsCacheValue>(CACHE_SIZE + 1, 1.1f, true) {
+	    private static final long serialVersionUID = -8171861525079261380L;
+
+	    protected boolean removeEldestEntry(java.util.Map.Entry<Integer, ResultsCacheValue> eldest) {
+		return size() > CACHE_SIZE;
+	    };
+	};
+
+	queryHashToResultsCache = Collections.synchronizedMap(resultsCache);
+
 	LinkedHashMap<String, Long> idCache = new LinkedHashMap<String, Long>(CACHE_SIZE + 1, 1.1f, true) {
 	    private static final long serialVersionUID = -8171861525079261380L;
 
@@ -72,19 +86,43 @@ public class Querier {
 	objectLabelCache = Collections.synchronizedMap(labelCache);
     }
 
-    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit) throws QueryBuilderVisitorException, IOException {
+    private static int getHashForQuery(String indexName, String query, int startItem, int maxNumItems) {
+	long l = indexName.hashCode();
+	l += query.hashCode();
+	l += startItem;
+	l += maxNumItems * 1299827l;
+	return (int) (l ^ (l >>> 32));
+    }
+
+    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit)
+	    throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
 	}
 
-	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
-
 	queryLogger.start();
 
-	int numResults = index.process(startItem, maxNumItems, results, query);
+	Integer queryHash = getHashForQuery(index.getIndexName(), query.toString(), startItem, maxNumItems);
 
-	if (results.size() > maxNumItems) {
-	    results.size(maxNumItems);
+	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
+	int numResults;
+
+	if (queryHashToResultsCache.containsKey(queryHash)) {
+	    ResultsCacheValue cachedResults = queryHashToResultsCache.get(queryHash);
+	    results = cachedResults.results;
+	    numResults = cachedResults.numResults;
+	} else {
+	    results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
+	    numResults = index.process(startItem, maxNumItems, results, query);
+
+	    if (numResults > BIG_RESULTS_LIMIT) {
+		// Queries that return lots of results are slow. Cache them.
+		queryHashToResultsCache.put(queryHash, new ResultsCacheValue(numResults, results));
+	    }
+
+	    if (results.size() > maxNumItems) {
+		results.size(maxNumItems);
+	    }
 	}
 
 	ObjectArrayList<RDFResultItem> resultItems = new ObjectArrayList<RDFResultItem>();
@@ -121,7 +159,8 @@ public class Querier {
 	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int) time);
     }
 
-    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit) throws IOException {
+    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
+	    throws IOException {
 	InputStream docInputStream;
 	try {
 	    docInputStream = index.getDocumentInputStream(docId);
@@ -144,6 +183,8 @@ public class Querier {
 	item.setSubjectId(record.getId());
 	item.setSubject(record.getSubject());
 	item.setScore(score);
+	
+	Map<String, MutableInt> predicateToAccumulatedOjectLengthMap = new HashMap<String, MutableInt>();
 
 	for (String relationString : record.getRelations()) {
 	    Node[] predicateObjectContext;
@@ -154,16 +195,31 @@ public class Querier {
 	    }
 
 	    String predicate = predicateObjectContext[0].toString();
-	    String object = predicateObjectContext[1].toString();
-	    if (objectLengthLimit != null && object.length() > objectLengthLimit) {
-		object = object.substring(0, objectLengthLimit) + "...";
+	    String object = predicateObjectContext[1].toString().trim();
+	    
+	    if (objectLengthLimit != null) {
+		MutableInt accumulatedOjectLength = predicateToAccumulatedOjectLengthMap.get(predicate);
+		if (accumulatedOjectLength == null) {
+		    accumulatedOjectLength = new MutableInt(0);
+		    predicateToAccumulatedOjectLengthMap.put(predicate, accumulatedOjectLength);
+		} else if (accumulatedOjectLength.intValue() >= objectLengthLimit) {
+		    continue;
+		}
+		
+		// If the new accumulated length will be more than the limit(plus a bit).
+		if (accumulatedOjectLength.intValue() + object.length() > objectLengthLimit + 20) {
+		    object = object.substring(0, objectLengthLimit - accumulatedOjectLength.intValue()) + "...";
+		}
+		accumulatedOjectLength.add(object.length());
 	    }
+	    
 	    String context;
 	    if (predicateObjectContext.length > 2) {
 		context = predicateObjectContext[2].toString();
 	    } else {
 		context = DEFAULT_CONTEXT;
 	    }
+	    
 	    boolean indexed = index.getIndexedPredicates().contains(Util.encodeFieldName(predicate));
 
 	    String label = null;
@@ -190,7 +246,7 @@ public class Querier {
 		    label = objectLabelCache.get(subjectIdOfObject);
 		} else {
 		    // If the object is also a subject Resource/BNode this
-		    // will return that subjects id with is the same as the
+		    // will return that subjects id which is the same as the
 		    // docId. Parse the subject doc that this object refers
 		    // too..
 		    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false, null);
@@ -200,6 +256,11 @@ public class Querier {
 		    objectLabelCache.put(subjectIdOfObject, label);
 		}
 	    }
+	    
+	    // If the final label is the same as the object we just use the object.
+	    if (object.equals(label)) {
+		label = null;
+	    }
 
 	    item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
 	}
@@ -207,5 +268,15 @@ public class Querier {
 	docInputStream.close();
 
 	return item;
+    }
+
+    private static class ResultsCacheValue {
+	public final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
+	public final int numResults;
+
+	public ResultsCacheValue(int numResults, ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results) {
+	    this.results = results;
+	    this.numResults = numResults;
+	}
     }
 }

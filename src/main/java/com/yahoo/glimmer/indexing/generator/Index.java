@@ -20,6 +20,7 @@ import it.unimi.di.big.mg4j.index.IndexWriter;
 import it.unimi.di.big.mg4j.io.HadoopFileSystemIOFactory;
 import it.unimi.di.big.mg4j.io.IOFactory;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedWriter;
@@ -39,6 +40,7 @@ import com.yahoo.glimmer.indexing.ResourceRefTermProcessor;
 public class Index {
     private PrintWriter terms;
     private OutputStream properties;
+    private OutputBitStream docSizes;
     private IndexWriter indexWriter;
 
     private FileSystem fs;
@@ -49,7 +51,7 @@ public class Index {
 
     private boolean positions;
     private String hashValuePrefix;
-
+    
     public Index(FileSystem fs, Path outputDir, String indexName, long numDocs, boolean positions, String hashValuePrefix, int indexWriterCacheSize) {
 	this.fs = fs;
 	this.outputDir = outputDir;
@@ -68,10 +70,10 @@ public class Index {
 	
 
 	Path termsPath = new Path(outputDir, name + DiskBasedIndex.TERMS_EXTENSION);
-	terms = new PrintWriter(new BufferedWriter(new OutputStreamWriter(fs.create(termsPath, true), "UTF-8")));// overwrite
+	terms = new PrintWriter(new BufferedWriter(new OutputStreamWriter(fs.create(termsPath, false), "UTF-8")));
 
 	Path propertiesPath = new Path(outputDir, name + DiskBasedIndex.PROPERTIES_EXTENSION);
-	properties = fs.create(propertiesPath, true);// overwrite
+	properties = fs.create(propertiesPath, false);
 
 	Map<Component, Coding> defaultStandardIndexFlags = new Object2ObjectOpenHashMap<Component, Coding>(CompressionFlags.DEFAULT_STANDARD_INDEX);
 	if (!positions) {
@@ -80,7 +82,6 @@ public class Index {
 	}
 	
 	IOFactory ioFactory = new HadoopFileSystemIOFactory(fs);
-	
 //	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), indexWriterCacheSize, defaultStandardIndexFlags, ByteOrder.nativeOrder());
 	indexWriter = new BitStreamIndexWriter(ioFactory, basename, numDocs, true, defaultStandardIndexFlags);
     }
@@ -101,6 +102,25 @@ public class Index {
 	return properties;
     }
 
+    private long docSizesLastDocument = -1;
+    
+    public void writeDocSize(long document, int size) throws IOException {
+	if (document <= docSizesLastDocument) {
+	    throw new IllegalArgumentException("Given document ID " + document + " isn't bigger than the document ID given in the previous call " + docSizesLastDocument);
+	}
+	
+	if (docSizes == null) {
+	    // Only create the file when needed.  writeDocSize() shouldn't be called for vertical indexes.
+	    Path docSizesPath = new Path(outputDir, name + DiskBasedIndex.SIZES_EXTENSION);
+	    docSizes = new OutputBitStream(fs.create(docSizesPath, false));
+	}
+	
+	for (docSizesLastDocument++ ; docSizesLastDocument < document; docSizesLastDocument++) {
+	    docSizes.writeGamma(0);
+	}
+	docSizes.writeGamma(size);
+    }
+
     public void close(long writtenOccurrences) throws IOException {
 	try {
 	    Properties props = indexWriter.properties();
@@ -119,6 +139,14 @@ public class Index {
 	}
 
 	properties.close();
+	
+	if (docSizes != null) {
+	    for (; docSizesLastDocument < numDocs; docSizesLastDocument++) {
+		docSizes.writeGamma(0);
+	    }
+	    docSizes.close();
+	}
+	
 	terms.close();
 	indexWriter.close();
     }

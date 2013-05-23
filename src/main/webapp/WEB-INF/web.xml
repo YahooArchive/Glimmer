@@ -1,50 +1,28 @@
-<web-app xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee web-app_2_4.xsd" version="2.4">
+<web-app xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee web-app_2_4.xsd"
+	version="2.4">
 
 	<description>Glimmer RDF Text Search Web App</description>
 
-	<jsp-config>
-		<jsp-property-group>
-			<url-pattern>*.jsp</url-pattern>
-			<el-enabled>true</el-enabled>
-			<scripting-enabled>true</scripting-enabled>
-			<deferred-syntax-allowed-as-literal>true
-			</deferred-syntax-allowed-as-literal>
-		</jsp-property-group>
-	</jsp-config>
-	
-	
-
-	<context-param>
-		<param-name>yjava_yiv_servlet.parameter_yq</param-name>
-		<param-value>NONE</param-value>
-	</context-param>
-
 	<servlet>
-		<servlet-name>query</servlet-name>
-		<servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
+		<servlet-name>glimmer</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<load-on-startup>1</load-on-startup>
 	</servlet>
 	<servlet-mapping>
-		<servlet-name>query</servlet-name>
-		<url-pattern>/query.do</url-pattern>
+		<servlet-name>glimmer</servlet-name>
+		<url-pattern>/ajax/*</url-pattern>
 	</servlet-mapping>
-
-	<servlet>
-        <servlet-name>glimmer</servlet-name>
-        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
-        <load-on-startup>1</load-on-startup>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>glimmer</servlet-name>
-        <url-pattern>/ajax/*</url-pattern>
-    </servlet-mapping>
-
+	
+	<servlet-mapping>
+		<servlet-name>glimmer</servlet-name>
+		<url-pattern>/v1/search</url-pattern>
+	</servlet-mapping>
 
 	<welcome-file-list>
 		<welcome-file>search.html</welcome-file>
 	</welcome-file-list>
 
 	<session-config>
-		<session-timeout>30</session-timeout>
+		<session-timeout>60</session-timeout>
 	</session-config>
-</web-app> 
+</web-app>

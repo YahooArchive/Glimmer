@@ -72,10 +72,6 @@ class VerticalDocument extends RDFDocument {
 		continue;
 	    }
 	    
-	    if (predicate.equals(RDF.TYPE.toString())) {
-		factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-	    }
-	    
 	    List<String> fieldForPredicate = fields.get(fieldIndex);
 
 	    if (relation.getObject() instanceof Resource || relation.getObject() instanceof BNode) {
@@ -85,6 +81,20 @@ class VerticalDocument extends RDFDocument {
 		    throw new IllegalStateException("Object " + relation.getObject().toString() + " not in resources hash function!");
 		}
 		fieldForPredicate.add(objectId);
+		
+		if (predicate.equals(RDF.TYPE.toString())) {
+		    // If the predicate is RDF type and the object is a Resource we use the ontology(if set)
+		    // to also index all super types.
+		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
+		    
+		    for (String ancestor : factory.getAncestors(relation.getObject().toString())) {
+			String ancestorId = factory.lookupResource(ancestor, true);
+			if (ancestorId == null) {
+			    throw new IllegalStateException("Ancestor(" + ancestor + ") of " + relation.getObject().toString() + " not in resources hash function!. Was the same ontology used with the PrepTool?");
+			}
+			fieldForPredicate.add(ancestorId);
+		    }
+		}
 	    } else {
 		String object = relation.getObject().toString();
 

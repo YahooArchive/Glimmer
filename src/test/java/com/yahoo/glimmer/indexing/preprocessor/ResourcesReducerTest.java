@@ -11,12 +11,15 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
@@ -35,6 +38,7 @@ import com.yahoo.glimmer.util.BySubjectRecord;
 public class ResourcesReducerTest {
     private Mockery context;
     private Reducer<Text, Text, Text, Object>.Context mrContext;
+    private Counter duplicateMatchCounter;
 
     
     public static class OutputCountMatcher extends BaseMatcher<OutputCount> {
@@ -89,6 +93,7 @@ public class ResourcesReducerTest {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	mrContext = context.mock(Reducer.Context.class, "mrContext");
+	duplicateMatchCounter = new Counter();
     }
 
     @Test
@@ -103,7 +108,10 @@ public class ResourcesReducerTest {
 			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/subject/uri\t"
 				+ "<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .\t"
 				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .\t"
-				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .\t")));
+				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .\t"
+				+ "<http://some/predicate/uri/4> \"Duplicate value\" <http://some/context/uri4> .\t")));
+		one(mrContext).getCounter(ResourcesReducer.Counters.DUPLICATE_RELATIONS);
+		will(returnValue(duplicateMatchCounter));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
@@ -111,10 +119,13 @@ public class ResourcesReducerTest {
 	Iterable<Text> values = new TextReuseIterable(
 		"<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
 		"<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .",
-		"<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .");
+		"<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .",
+		"<http://some/predicate/uri/4> \"Duplicate value\" <http://some/context/uri4> .",
+		"<http://some/predicate/uri/4> \"Duplicate value\" <http://some/context/uri4> .");
 
 	reducer.reduce(new Text("http://some/subject/uri"), values, mrContext);
 	context.assertIsSatisfied();
+	assertEquals(1l, duplicateMatchCounter.getValue());
     }
 
     @Test

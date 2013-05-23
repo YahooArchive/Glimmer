@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Reducer.Context;
@@ -32,7 +31,6 @@ import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 public class TermReduceTest {
     private Mockery context;
     private Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context reducerContext;
-    private Configuration reducerConf;
 
     @SuppressWarnings("unchecked")
     @Before
@@ -40,14 +38,11 @@ public class TermReduceTest {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	reducerContext = context.mock(Context.class, "reducerContext");
-	reducerConf = new Configuration();
     }
 
     @Test
     public void treeTermsTest() throws Exception {
 	context.checking(new Expectations() {{
-	    allowing(reducerContext).getConfiguration();
-	    	will(returnValue(reducerConf));
 	    allowing(reducerContext).setStatus(with(any(String.class)));
 	    one(reducerContext).write(
 		    with(new IntWritable(0)),
@@ -108,6 +103,16 @@ public class TermReduceTest {
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
 		    with(new IndexRecordWriterDocValueMatcher(1)));
+	    // Doc sizes
+	    one(reducerContext).write(
+		    with(new IntWritable(2)),
+		    with(new IndexRecordWriterSizeValueMatcher(20, 4)));
+	    one(reducerContext).write(
+		    with(new IntWritable(2)),
+		    with(new IndexRecordWriterSizeValueMatcher(24, 3)));
+	    one(reducerContext).write(
+		    with(new IntWritable(2)),
+		    with(new IndexRecordWriterSizeValueMatcher(27, 2)));
 	}});
 	
 	TermReduce reducer = new TermReduce();
@@ -115,9 +120,9 @@ public class TermReduceTest {
 	
 	TermKey key = new TermKey("term1", 0, null);
 	ArrayList<TermValue> values = new ArrayList<TermValue>();
-	values.add(new TermValue(Type.DOC_STATS, 2, 15));
-	values.add(new TermValue(Type.DOC_STATS, 1, 12));
-	values.add(new TermValue(Type.DOC_STATS, 3, 18));
+	values.add(new TermValue(Type.TERM_STATS, 2, 15));
+	values.add(new TermValue(Type.TERM_STATS, 1, 12));
+	values.add(new TermValue(Type.TERM_STATS, 3, 18));
 	values.add(new TermValue(Type.OCCURRENCE, 3, 11));
 	values.add(new TermValue(Type.OCCURRENCE, 3, 15));
 	values.add(new TermValue(Type.OCCURRENCE, 4, 12));
@@ -135,8 +140,8 @@ public class TermReduceTest {
 	
 	key = new TermKey("term2", 1, null);
 	values.clear();
-	values.add(new TermValue(Type.DOC_STATS, 2, 19));
-	values.add(new TermValue(Type.DOC_STATS, 2, 16));
+	values.add(new TermValue(Type.TERM_STATS, 2, 19));
+	values.add(new TermValue(Type.TERM_STATS, 2, 16));
 	values.add(new TermValue(Type.OCCURRENCE, 1, 10));
 	values.add(new TermValue(Type.OCCURRENCE, 1, 19));
 	values.add(new TermValue(Type.OCCURRENCE, 7, 13));
@@ -151,13 +156,13 @@ public class TermReduceTest {
 
 	key = new TermKey("term3", 0, null);
 	values.clear();
-	values.add(new TermValue(Type.DOC_STATS, 2, 7));
+	values.add(new TermValue(Type.TERM_STATS, 2, 7));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 5));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 7));
 	reducer.reduce(key, values, reducerContext);
 	key = new TermKey("term3", 1, null);
 	values.clear();
-	values.add(new TermValue(Type.DOC_STATS, 2, 11));
+	values.add(new TermValue(Type.TERM_STATS, 2, 11));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 10));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 11));
 	reducer.reduce(key, values, reducerContext);
@@ -168,6 +173,14 @@ public class TermReduceTest {
 	values.add(new TermValue(Type.INDEX_ID, 0));
 	values.add(new TermValue(Type.INDEX_ID, 1));
 	values.add(new TermValue(Type.INDEX_ID, 1));
+	reducer.reduce(key, values, reducerContext);
+
+	// Doc sizes
+	key = new TermKey(TermKey.DOC_SIZE_TERM, 2, null);
+	values.clear();
+	values.add(new TermValue(Type.DOC_SIZE, 20, 4));
+	values.add(new TermValue(Type.DOC_SIZE, 24, 3));
+	values.add(new TermValue(Type.DOC_SIZE, 27, 2));
 	reducer.reduce(key, values, reducerContext);
 	
 	context.assertIsSatisfied();
@@ -184,7 +197,6 @@ public class TermReduceTest {
 	    termValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
 	}
 	
-	
 	@Override
 	public boolean matches(Object object) {
 	    return termValue.equals(object);
@@ -195,10 +207,31 @@ public class TermReduceTest {
 	    description.appendText(termValue.toString());
 	}
     }
+    
+    private static class IndexRecordWriterSizeValueMatcher extends BaseMatcher<IndexRecordWriterSizeValue> {
+	private final IndexRecordWriterSizeValue sizeValue;
+	
+	public IndexRecordWriterSizeValueMatcher(long document, int size) {
+	    sizeValue = new IndexRecordWriterSizeValue();
+	    sizeValue.setDocument(document);
+	    sizeValue.setSize(size);
+	}
+	
+	@Override
+	public boolean matches(Object object) {
+	    return sizeValue.equals(object);
+	}
+	
+	@Override
+	public void describeTo(Description description) {
+	    description.appendText(sizeValue.toString());
+	}
+    }
+    
     private static class IndexRecordWriterDocValueMatcher extends BaseMatcher<IndexRecordWriterDocValue> {
 	private final IndexRecordWriterDocValue docValue;
 	
-	public IndexRecordWriterDocValueMatcher(int document, int ... occurrences) {
+	public IndexRecordWriterDocValueMatcher(long document, int ... occurrences) {
 	    docValue = new IndexRecordWriterDocValue(1);
 	    docValue.setDocument(document);
 	    for (int i = 0 ; i < occurrences.length ; i++) {

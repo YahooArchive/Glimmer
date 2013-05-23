@@ -40,7 +40,7 @@ public class SetDocumentPriors {
 	    InputStreamReader priorRulesReader = new InputStreamReader(new FileInputStream(context.getDocumentPriorsRules()));
 	    Map<String, Integer> rules = readPriorRules(priorRulesReader);
 	    
-	    RDFIndex index = new RDFIndex(context);
+	    RDFIndex index = new RDFIndex("", context);
 	    Index fieldIndex = (BitStreamIndex) index.getField(context.getDocumentPriorsField());
 	    
 	    calculatePriors(fieldIndex.numberOfDocuments, index.getCollection(), rules, new FileOutputStream(context.getDocumentPriorsFile()));

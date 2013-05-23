@@ -13,6 +13,9 @@
 	<bean id="indexMap" class="com.yahoo.glimmer.web.IndexMap">
 		<property name="configFilename" value="exampleContext.properties" />
 	</bean>
+	<bean id="queryFilter" class="com.yahoo.glimmer.web.PhraseListQueryFilter">
+	    <property name="listResourceName" value="block_list.txt"/>
+	</bean>
 	<bean id="querier" class="com.yahoo.glimmer.web.Querier" />
 
 	<bean id="docObjectView" class="com.yahoo.glimmer.web.DocObjectView" />

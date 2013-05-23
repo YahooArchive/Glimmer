@@ -44,15 +44,15 @@ public class TripleIndexGenerator extends Configured implements Tool {
     private static final String PREDICATES_ARG = "properties";
     private static final String NO_CONTEXTS_ARG = "noContexts";
     private static final String RESOURCE_PREFIX_ARG = "resourcePrefix";
+    private static final String RESOURCES_HASH_ARG = "resourcesHash";
 
     // Job configuration attribute names
     static final String OUTPUT_DIR = "OUTPUT_DIR";
-    static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
+    static final String NUMBER_OF_DOCUMENTS = "numberOfDocs";
     static final String ALIGNMENT_INDEX_NAME = "alignment";
     static final String METHOD = "method";
     static final String INDEX_WRITER_CACHE_SIZE = "indexWriterCacheSize";
 
-    private static final String RESOURCES_HASH_ARG = "RESOURCES_HASH";
 
     static { // register comparator
 	WritableComparator.define(TermKey.class, new TermKey.Comparator());
@@ -71,7 +71,6 @@ public class TripleIndexGenerator extends Configured implements Tool {
 		new UnflaggedOption(NUMBER_OF_DOCS_ARG, JSAP.LONG_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
 		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
-
 	});
 
 	JSAPResult jsapResult = jsap.parse(args);
