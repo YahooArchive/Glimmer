@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -46,9 +47,11 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
     private final DocumentFactory documentFactory;
 
     private transient BlockOffsets blockOffsets;
-    private transient ThreadLocal<UncompressedInputStream> threadLocalUncompressedInputStream;
-    
+    // There is only one instance of this class for the document collection, but multiple threads call stream();
+    // We need a UncompressedInputStream per thread, but not using ThreadLocal as this is used in a Web Container.
+    private transient Map<Thread, UncompressedInputStream> threadToUncompressedInputStreamMap = new HashMap<Thread, UncompressedInputStream>();
     private transient Map<Long, Long> docIdToBlockCache;
+    private transient ByteBufferInputStream byteBufferInputStream;
 
     public BlockCompressedDocumentCollection(String name, DocumentFactory documentFactory, final int cacheSize) {
 	this.name = new File(name).getName();
@@ -83,19 +86,14 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
     }
 
     public void init(final ByteBufferInputStream byteBufferInputStream, InputStream blockOffsetsInputStream) throws IOException {
+	this.byteBufferInputStream = byteBufferInputStream;
+	
 	DataInputStream blockOffsetsDataInput = new DataInputStream(blockOffsetsInputStream);
 	try {
 	    blockOffsets = (BlockOffsets) BinIO.loadObject(blockOffsetsDataInput);
 	} catch (ClassNotFoundException e) {
 	    throw new RuntimeException("BinIO.loadObject() threw:" + e);
 	}
-
-	threadLocalUncompressedInputStream = new ThreadLocal<UncompressedInputStream>() {
-	    @Override
-	    protected UncompressedInputStream initialValue() {
-		return new UncompressedInputStream(byteBufferInputStream.copy());
-	    }
-	};
     }
 
     @Override
@@ -121,7 +119,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	    throw e;
 	}
 	time = System.currentTimeMillis() - time;
-	LOGGER.info("stream(" + index + ") took " + time + "ms.");
+	LOGGER.debug("stream(" + index + ") took " + time + "ms.");
 	
 	if (inputStream == null) {
 	    inputStream = new ByteArrayInputStream(ZERO_BYTE_BUFFER);
@@ -172,7 +170,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	    return null;
 	}
 	
-	UncompressedInputStream uncompressedInputStream = threadLocalUncompressedInputStream.get();
+	UncompressedInputStream uncompressedInputStream = getThreadsUncompressedInputStream();
 
 	int retries = 3;
 	while (retries > 0) {
@@ -204,6 +202,13 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 			}
 			return b;
 		    }
+		    
+		    @Override
+		    public void close() throws IOException {
+		        super.close();
+		        bis.close();
+		        //threadLocalUncompressedInputStream.remove();
+		    }
 		};
 	    case NOT_FOUND:
 		docIdToBlockCache.put(docId, -1l);
@@ -224,6 +229,15 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	}
 	docIdToBlockCache.put(docId, -1l);
 	return null;
+    }
+
+    private synchronized UncompressedInputStream getThreadsUncompressedInputStream() {
+	UncompressedInputStream uncompressedInputStream = threadToUncompressedInputStreamMap.get(Thread.currentThread());
+	if (uncompressedInputStream == null) {
+	    uncompressedInputStream = new UncompressedInputStream(byteBufferInputStream.copy());
+	    threadToUncompressedInputStreamMap.put(Thread.currentThread(), uncompressedInputStream);
+	}
+	return uncompressedInputStream;
     }
 
     private static final int BYTE_BUFFER_LENGTH = 32;
@@ -325,10 +339,6 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
     @Override
     public void close() throws IOException {
         super.close();
-        // We have to remove the thread local object as in containers like tomcat the thread may still exist after the app is undeployed.
-        if (threadLocalUncompressedInputStream != null) {
-            threadLocalUncompressedInputStream.remove();
-        }
     }
 
     public static void main(String[] args) throws IOException {

@@ -22,7 +22,8 @@ YUI.add('yui-pager', function (Y){
 		showingResultsTo: " to ",
 		showingResultsOf: " of ",
 		pagerElements: undefined,
-		statusElements: undefined
+		statusElements: undefined,
+		numberFormatter: undefined
 	};
 	
 	function appendElement(element, innerHtml, targetPage, current) {
@@ -54,6 +55,10 @@ YUI.add('yui-pager', function (Y){
 		
 		setCallback: function(newCallback) {
 			state.callback = newCallback;
+		},
+		
+		setNumberFormatter: function(numberFormatter) {
+			state.numberFormatter = numberFormatter;
 		},
 		
 		setState: function(newState) {
@@ -124,6 +129,11 @@ YUI.add('yui-pager', function (Y){
 					to = state.items;
 				}
 				var of = state.items;
+				
+				if (state.numberFormatter !== undefined) {
+					of = state.numberFormatter(of);
+				}
+				
 				rootElement.setContent(state.showingResults + from + state.showingResultsTo + to + state.showingResultsOf + of);
 				
 			}

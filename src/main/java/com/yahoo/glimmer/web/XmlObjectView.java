@@ -21,8 +21,6 @@ import org.springframework.web.servlet.View;
 
 import com.thoughtworks.xstream.XStream;
 import com.yahoo.glimmer.query.RDFIndex;
-import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.RDFResultItem;
 
 /**
  * @{View that renders the model Object under OBJECT_KEY as XML

@@ -1,4 +1,4 @@
-package com.yahoo.glimmer.query;
+package com.yahoo.glimmer.web;
 
 /*
  * Copyright (c) 2012 Yahoo! Inc. All rights reserved.

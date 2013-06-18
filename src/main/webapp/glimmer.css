@@ -188,6 +188,19 @@ table.result .even {
 	margin: 0px 5px;
 }
 
+#statisticsTree .item-count {
+	font-size: 9px;
+	margin-left: 5px;
+}
+
+#statisticsTree .yui3-treeview-treelabel:hover {
+	background-color: transparent;
+}
+
+#statisticsTree a:focus, span:focus {
+	outline: none;
+}
+
 #results-container table .predicate-col {
 	column-width: 100px;
 	-moz-column-width: 100px; /* Firefox */

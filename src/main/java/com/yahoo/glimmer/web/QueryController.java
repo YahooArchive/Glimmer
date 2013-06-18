@@ -38,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFIndexStatistics;
-import com.yahoo.glimmer.query.RDFQueryResult;
 
 @Controller()
 public class QueryController {

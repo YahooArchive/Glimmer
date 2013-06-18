@@ -24,6 +24,7 @@ import it.unimi.di.big.mg4j.query.QueryEngine;
 import it.unimi.di.big.mg4j.query.SelectedInterval;
 import it.unimi.di.big.mg4j.query.nodes.Query;
 import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.query.nodes.Select;
 import it.unimi.di.big.mg4j.search.DocumentIteratorBuilderVisitor;
 import it.unimi.di.big.mg4j.search.score.CountScorer;
 import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
@@ -77,6 +78,8 @@ public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
     public final static int MAX_STEMMING = 1024;
 
+    private final static String TYPE_FEILD_NAME = Util.encodeFieldName(RDF.TYPE.toString());
+    
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
 
     private final static String ALIGNMENT_INDEX_NAME = "alignment";
@@ -638,7 +641,15 @@ public class RDFIndex {
 
     public int process(final int offset, final int length, final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results,
 	    final Query... queries) throws QueryBuilderVisitorException, IOException {
-	return queryEngine.copy().process(queries, offset, length, results);
+	QueryEngine engine = queryEngine.copy();
+	if (queries.length == 1 && queries[0] instanceof Select) {
+	    // If it is only a query by type disable the scorer for this query
+	    Select select = (Select) queries[0];
+	    if (TYPE_FEILD_NAME.equals(select.index)) {
+		engine.score(new Scorer[0], new double[0]);
+	    }
+	}
+	return engine.process(queries, offset, length, results);
     }
 
     public void destroy() {

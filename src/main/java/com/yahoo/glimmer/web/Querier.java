@@ -35,8 +35,6 @@ import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
-import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.RDFResultItem;
 import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Util;
 
@@ -107,6 +105,7 @@ public class Querier {
 	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
 	int numResults;
 
+	// TODO: Caching results here maybe pointless now that queries by type only aren't scored.  See RDFIndex.process();
 	if (queryHashToResultsCache.containsKey(queryHash)) {
 	    ResultsCacheValue cachedResults = queryHashToResultsCache.get(queryHash);
 	    results = cachedResults.results;

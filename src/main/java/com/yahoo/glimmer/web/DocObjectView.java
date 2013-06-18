@@ -19,8 +19,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.web.servlet.View;
 
-import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.RDFResultItem;
 
 public class DocObjectView implements View {
     private boolean includeUri;

@@ -161,7 +161,7 @@ YUI({
 								return rt;
 							}
 							
-							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.count;
+							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + '<span class="item-count">' + renderNumber(clazz.count) + '</span>';
 							
 							label += '</a>';
 							rt.label = label;
@@ -379,7 +379,7 @@ YUI({
 						var result = Y.JSON.parse(response.responseText);
 						
 						Y.one("#results-loader").hide();
-						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
+						Y.one("#result-stats").setContent("Found " + renderNumber(result.numResults) + " results in " + result.time + " ms.");
 
 						var ol = Y.Node.create("<ol></ol>");
 						ol.setAttribute("start", result.pageStart + 1);
@@ -635,6 +635,17 @@ YUI({
 			}
 		}
 		
+		function renderNumber(number) {
+			if (number >= 1000000000) {
+				return "~" + Math.floor(number / 1000000000) + " billion";
+			} else if (number >= 1000000) {
+				return "~" + Math.floor(number / 1000000) + " million";
+			} else if (number >= 1000) {
+				return "~" + Math.floor(number / 1000) + " thousand";
+			}
+			return number;
+		}
+		
 		// The ajax query requests are driven through the history object.
 		// We listen for changes and update the results as appropriated.
 		history.on('change', function (e) {
@@ -675,9 +686,10 @@ YUI({
 		Y.one('#unifiedsearchform').on('submit', executeUnifiedSearch);
 
 		resultsPager.setCallback(pagerPage);
+		resultsPager.setNumberFormatter(renderNumber);
 		resultsPager.setState({
 			pagerElements: ['#results-pager-top', '#results-pager-bottom'],
-			statusElements: ["#results-pager-top-status"]
+			statusElements: ['#results-pager-top-status']
 		});
 	}
 );
