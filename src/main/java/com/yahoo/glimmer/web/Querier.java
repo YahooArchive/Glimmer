@@ -92,7 +92,7 @@ public class Querier {
 	return (int) (l ^ (l >>> 32));
     }
 
-    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit)
+    public QueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit)
 	    throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
@@ -124,13 +124,13 @@ public class Querier {
 	    }
 	}
 
-	ObjectArrayList<RDFResultItem> resultItems = new ObjectArrayList<RDFResultItem>();
+	ObjectArrayList<QueryResultItem> resultItems = new ObjectArrayList<QueryResultItem>();
 	if (!results.isEmpty()) {
 	    for (int i = 0; i < results.size(); i++) {
 		DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>> dsi = results.get(i);
 		LOGGER.debug("Intervals for item " + i);
 		LOGGER.debug("score " + dsi.score);
-		RDFResultItem item = createRdfResultItem(index, dsi.document, dsi.score, deref, objectLengthLimit);
+		QueryResultItem item = createRdfResultItem(index, dsi.document, dsi.score, deref, objectLengthLimit);
 		if (item == null) {
 		    LOGGER.error("Document id " + dsi.document + " isn't in collection(or has null content).");
 		} else {
@@ -140,25 +140,25 @@ public class Querier {
 	}
 
 	long time = queryLogger.endQuery(query.toString(), numResults);
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, (int) time);
+	QueryResult result = new QueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, (int) time);
 	return result;
     }
 
-    public RDFQueryResult doQueryForDocId(RDFIndex index, long id, boolean deref, Integer objectLengthLimit) throws IOException {
+    public QueryResult doQueryForDocId(RDFIndex index, long id, boolean deref, Integer objectLengthLimit) throws IOException {
 	queryLogger.start();
-	RDFResultItem resultItem = createRdfResultItem(index, id, 1.0d, deref, objectLengthLimit);
+	QueryResultItem resultItem = createRdfResultItem(index, id, 1.0d, deref, objectLengthLimit);
 	long time = queryLogger.endQuery("getDoc " + Long.toString(id), 1);
 
-	List<RDFResultItem> results;
+	List<QueryResultItem> results;
 	if (resultItem != null) {
 	    results = Collections.singletonList(resultItem);
 	} else {
 	    results = Collections.emptyList();
 	}
-	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int) time);
+	return new QueryResult("", null, results.size(), 0, 1, results, (int) time);
     }
 
-    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
+    private QueryResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
 	    throws IOException {
 	InputStream docInputStream;
 	try {
@@ -178,7 +178,7 @@ public class Querier {
 	    LOGGER.error("Wanted doc id:" + docId + " but got doc id:" + record.getId());
 	}
 
-	RDFResultItem item = new RDFResultItem();
+	QueryResultItem item = new QueryResultItem();
 	item.setSubjectId(record.getId());
 	item.setSubject(record.getSubject());
 	item.setScore(score);
@@ -248,7 +248,7 @@ public class Querier {
 		    // will return that subjects id which is the same as the
 		    // docId. Parse the subject doc that this object refers
 		    // too..
-		    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false, null);
+		    QueryResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false, null);
 		    if (objectItem != null) {
 			label = objectItem.getLabel();
 		    }

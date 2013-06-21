@@ -16,8 +16,8 @@ import java.util.List;
 /**
  * Wire Results object.
  */
-public class RDFQueryResult {
-    private final List<RDFResultItem> resultItems;
+public class QueryResult {
+    private final List<QueryResultItem> resultItems;
     private final int numResults;
     private final int pageStart;
     private final int pageSize;
@@ -25,7 +25,7 @@ public class RDFQueryResult {
     private final String query;
     private final String parsedQuery;
 
-    public RDFQueryResult(String query, String parsedQuery, int numResults, int pageStart, int pageSize, List<RDFResultItem> resultItems, int time) {
+    public QueryResult(String query, String parsedQuery, int numResults, int pageStart, int pageSize, List<QueryResultItem> resultItems, int time) {
 	super();
 	this.resultItems = resultItems;
 	this.numResults = numResults;
@@ -36,7 +36,7 @@ public class RDFQueryResult {
 	this.parsedQuery = parsedQuery;
     }
     
-    public List<RDFResultItem> getResultItems() {
+    public List<QueryResultItem> getResultItems() {
 	return resultItems;
     }
 

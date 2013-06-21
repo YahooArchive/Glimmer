@@ -100,7 +100,7 @@ public class QueryController {
 	    throw new HttpMessageConversionException("No query given.");
 	}
 	
-	RDFQueryResult result;
+	QueryResult result;
 	if (queryFilter != null && queryFilter.filter(query)) {
 	    LOGGER.info("Blocking query:" + query + " from address:" + httpServletRequest.getRemoteAddr());
 	    throw new HttpMessageConversionException("Bad query given.");

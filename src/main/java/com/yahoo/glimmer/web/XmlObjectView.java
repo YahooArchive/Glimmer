@@ -47,16 +47,16 @@ public class XmlObjectView implements View {
 	response.setContentType(getContentType());
 	PrintWriter writer = response.getWriter();
 
-	if (object instanceof RDFQueryResult) {
+	if (object instanceof QueryResult) {
 	    RDFIndex index = (RDFIndex) model.get(QueryController.INDEX_KEY);
 	    if (index == null) {
 		throw new IllegalArgumentException("Model does not contain an index!");
 	    }
 
-	    RDFQueryResult result = (RDFQueryResult) object;
+	    QueryResult result = (QueryResult) object;
 	    // FIXME: this is not XML!!!!
 	    int resultCount = 0;
-	    for (RDFResultItem item : result.getResultItems()) {
+	    for (QueryResultItem item : result.getResultItems()) {
 		resultCount++;
 		writer.println("<result> " + resultCount + "</result>");
 		writer.println("<score>" + item.getScore() + "</score>");

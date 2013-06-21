@@ -41,9 +41,9 @@ public class DocObjectView implements View {
 	PrintWriter writer = response.getWriter();
 
 	// Return URIs and docs separated by tab
-	if (object instanceof RDFQueryResult) {
-	    RDFQueryResult result = (RDFQueryResult) object;
-	    for (RDFResultItem item : result.getResultItems()) {
+	if (object instanceof QueryResult) {
+	    QueryResult result = (QueryResult) object;
+	    for (QueryResultItem item : result.getResultItems()) {
 		if (includeUri) {
 		    writer.println(item.getSubject());
 		}

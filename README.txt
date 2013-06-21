@@ -1,4 +1,4 @@
-Welcome to Glimmer
+Welcome to Glimmer!
 
 Glimmer uses several 3rd party open source libraries and tools.
 This file summarizes the tools used, their purpose, and the licenses under which they're released.
@@ -21,7 +21,7 @@ this project, but instead are separately downloaded from the respective provider
   http://jcp.org/aboutJava/communityprocess/mrel/jsr154/index.html
 			
 * Fastutil version 6.4.4 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
-  Extends the Java™ Collections Framework by providing type-specific maps, sets, lists and queues with a small memory footprint and fast access and insertion
+  Extends the Java‚Ñ¢ Collections Framework by providing type-specific maps, sets, lists and queues with a small memory footprint and fast access and insertion
   http://fastutil.di.unimi.it/
 			
 * DSI Utils version 2.0.6 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
@@ -73,7 +73,7 @@ this project, but instead are separately downloaded from the respective provider
   http://hc.apache.org/httpclient-3.x/
   
 * Tika version 1.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
-  The Apache Tika™ toolkit detects and extracts metadata and structured text content from various documents...
+  The Apache Tika‚Ñ¢ toolkit detects and extracts metadata and structured text content from various documents...
   http://tika.apache.org/	
 			
 * Java Mail version 1.4.5 (Oracle Binary Code License - http://www.oracle.com/technetwork/java/javase/terms/license/index.html)

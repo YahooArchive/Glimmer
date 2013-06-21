@@ -14,7 +14,7 @@ package com.yahoo.glimmer.web;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RDFResultItem {
+public class QueryResultItem {
     public static class Relation {
 	private final String predicate;
 	private final String object;

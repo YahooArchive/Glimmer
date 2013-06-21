@@ -260,19 +260,9 @@ table.result .even {
 	margin-bottom: -20px;
 }
 
-#pageHeader h1 {
-	color: #000;
-	margin: 0 0 5px 20px;
-	font-family: bold Helvetica, Arial, sans-serif;
-	letter-spacing: -1px;
+#pageHeader a {
+	float: right;
 }
-
-#pageHeader a:link,#pageHeader a:hover,#pageHeader a:visited {
-	color: #fff; //
-	background-color: #3399FF;
-	text-decoration: none;
-}
-
 
 #selectionbar ul {
 	margin: 0;

@@ -35,13 +35,13 @@ public class WebRequestDemo {
 	params.setIndex("wdc");
 	params.setQuery(args[0]);
 	
-	RDFQueryResult result = doRequest(params);
+	QueryResult result = doRequest(params);
 
 	// Use GSON to re-serialize the result again.
 	System.out.println(GSON.toJson(result));
     }
 
-    public static RDFQueryResult doRequest(RequestParams requestParams) throws IOException, URISyntaxException {
+    public static QueryResult doRequest(RequestParams requestParams) throws IOException, URISyntaxException {
 	HttpClient client = new HttpClient();
 	client.getParams().setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
 	GetMethod get = new GetMethod(requestParams.toUri().toString());
@@ -50,7 +50,7 @@ public class WebRequestDemo {
 	    client.executeMethod(get);
 	   
 	    Reader responseReader = new InputStreamReader(get.getResponseBodyAsStream());
-	    return GSON.fromJson(responseReader, RDFQueryResult.class);
+	    return GSON.fromJson(responseReader, QueryResult.class);
 	} finally {
 	    get.releaseConnection();
 	}
