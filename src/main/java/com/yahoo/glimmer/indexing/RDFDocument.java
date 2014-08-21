@@ -25,6 +25,7 @@ import org.semanticweb.yars.nx.parser.ParseException;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.glimmer.util.BySubjectRecord.BySubjectRecordException;
 
 
 // TODO The RDFDocument/RDFDocumentFactory classes could be simpler.  They are as they are because they were derived from MG4J's Document/DocumentFactory interfaces.
@@ -70,8 +71,11 @@ public abstract class RDFDocument {
 	    return;
 	}
 	
-	if (!record.parse(contentBytes, 0, contentLength)) {
+	try {
+	    record.readFrom(contentBytes, 0, contentLength);
+	} catch (BySubjectRecordException e) {
 	    factory.incrementCounter(RdfCounters.PARSE_ERROR, 1);
+	    // TODO How to fail?
 	}
 	
 	id = record.getId();

@@ -37,6 +37,7 @@ import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.QueryLogger.QueryTimer;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.glimmer.util.BySubjectRecord.BySubjectRecordException;
 import com.yahoo.glimmer.util.Util;
 
 /**
@@ -136,7 +137,10 @@ public class Querier {
 
 	BySubjectRecord record = new BySubjectRecord();
 
-	if (!record.parse(new InputStreamReader(docInputStream))) {
+	try {
+	    record.readFrom(new InputStreamReader(docInputStream));
+	} catch (BySubjectRecordException e) {
+	    LOGGER.warn("Failed to read doc with ID " + docId, e);
 	    return null;
 	    // throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}

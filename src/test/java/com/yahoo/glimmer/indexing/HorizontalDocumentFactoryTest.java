@@ -124,7 +124,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
@@ -228,6 +228,6 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

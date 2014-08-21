@@ -24,7 +24,7 @@ import com.yahoo.glimmer.util.BySubjectRecord;
 /**
  * Reducer
  * 
- * For the given Subject resource key concatanates all <predicate> <object>
+ * For the given Subject resource key concatenates all <predicate> <object>
  * <context> . for that key It also appends PREDICATE, OBJECT and/or CONTEXT
  * keywords if that keyword occurs once or more as a value.
  * 
@@ -39,7 +39,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     private long docId;
     
     static enum Counters {
-	TOO_MANY_RELATIONS, DUPLICATE_RELATIONS;
+	TOO_MANY_RELATIONS, DUPLICATE_RELATIONS, KEYS, KEY_SUBJECT, KEY_PREDICATE, KEY_OBJECT, KEY_CONTEXT, VALUES;
     }
     
     private final static Text SUBJECT_TEXT = new Text(TupleElementName.SUBJECT.name());
@@ -48,6 +48,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     private final static Text CONTEXT_TEXT = new Text(TupleElementName.CONTEXT.name());
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Object>.Context context) throws IOException, InterruptedException {
+	context.getCounter(Counters.KEYS).increment(1);
 	int keyPredicateCount = 0;
 	int keyObjectCount = 0;
 	int keyContextCount = 0;
@@ -63,6 +64,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	String lastValue = null;
 	
 	for (Text value : values) {
+	    context.getCounter(Counters.VALUES).increment(1);
 	    if (PREDICATE_TEXT.equals(value)) {
 		keyPredicateCount++;
 	    } else if (OBJECT_TEXT.equals(value)) {
@@ -100,22 +102,26 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	    context.write(key, bySubjectRecord);
 	    
 	    bySubjectRecord.setPreviousId(docId);
+	    context.getCounter(Counters.KEY_SUBJECT).increment(relationsCount);
 	}
 
 	if (keyPredicateCount > 0) {
 	    outputCount.output = OUTPUT.PREDICATE;
 	    outputCount.count = keyPredicateCount;
 	    context.write(key, outputCount);
+	    context.getCounter(Counters.KEY_PREDICATE).increment(keyPredicateCount);
 	}
 	if (keyObjectCount > 0) {
 	    outputCount.output = OUTPUT.OBJECT;
 	    outputCount.count = keyObjectCount;
 	    context.write(key, outputCount);
+	    context.getCounter(Counters.KEY_OBJECT).increment(keyObjectCount);
 	}
 	if (keyContextCount > 0) {
 	    outputCount.output = OUTPUT.CONTEXT;
 	    outputCount.count = keyContextCount;
 	    context.write(key, outputCount);
+	    context.getCounter(Counters.KEY_CONTEXT).increment(keyContextCount);
 	}
 	
 	docId++;

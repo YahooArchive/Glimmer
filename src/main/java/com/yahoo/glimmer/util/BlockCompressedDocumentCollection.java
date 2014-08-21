@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.io.ByteBufferInputStream;
 
-import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -18,87 +17,95 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
+import org.itadaki.bzip2.BZip2BitInputStream;
+import org.itadaki.bzip2.BZip2BlockDecompressor;
+import org.itadaki.bzip2.BZip2Constants;
 
+/**
+ * A DocumentCollection using a bzip2 file and a list of 'first docId in block' to block offsets.
+ * 
+ * Would be nice to make retrieval of docs that are not in the collection more efficient.
+ * @author tep
+ *
+ */
 public class BlockCompressedDocumentCollection extends AbstractDocumentCollection implements Serializable {
     private final static Logger LOGGER = Logger.getLogger(BlockCompressedDocumentCollection.class);
     private static final long serialVersionUID = -7943857364950329249L;
 
     private static final byte[] ZERO_BYTE_BUFFER = new byte[0];
 
-    // We use the smallest block size during compression to improve retrieval
-    // time(100KB).
-    private static final int UNCOMPRESSED_BLOCK_SIZE = 100000;
     public static final String COMPRESSED_FILE_EXTENSION = ".bz2";
     public static final String BLOCK_OFFSETS_EXTENSION = ".blockOffsets";
-
-    // TODO. What should this be? Getting end of stream errors!?
-    // 7 is the size of the BZ2 block header + 1, as the header is not byte aligned.
-    static final int FOOTER_LENGTH = 7;
 
     private final String name;
     private final DocumentFactory documentFactory;
 
-    private transient BlockOffsets blockOffsets;
-    // There is only one instance of this class for the document collection, but multiple threads call stream();
-    // We need a UncompressedInputStream per thread, but not using ThreadLocal as this is used in a Web Container.
-    private transient Map<Thread, UncompressedInputStream> threadToUncompressedInputStreamMap = new HashMap<Thread, UncompressedInputStream>();
-    private transient Map<Long, Long> docIdToBlockCache;
-    private transient ByteBufferInputStream byteBufferInputStream;
+    private BlockOffsets blockOffsets;
+    private FileInputStream bz2InputStream;
+    private FileChannel bz2FileChannel;
+    private int uncompressedBlockSize;
+    private BlockCache blockCache;
 
     public BlockCompressedDocumentCollection(String name, DocumentFactory documentFactory, final int cacheSize) {
 	this.name = new File(name).getName();
 	this.documentFactory = documentFactory;
-	
-	LinkedHashMap<Long, Long> cache = new LinkedHashMap<Long, Long>(cacheSize + 1, 1.1f, true) {
-	    private static final long serialVersionUID = 5729556634799579124L;
-
-	    protected boolean removeEldestEntry(java.util.Map.Entry<Long, Long> eldest) {
-		return size() > cacheSize;
-	    };
-	};
-	
-	docIdToBlockCache = Collections.synchronizedMap(cache);
     }
 
     @Override
     public void filename(CharSequence absolutePathToAFileInTheCollection) throws IOException {
-	initFiles(new File(absolutePathToAFileInTheCollection.toString()).getParentFile());
-    }
+	File absolutePathToCollection = new File(absolutePathToAFileInTheCollection.toString()).getParentFile();
 
-    private void initFiles(File absolutePathToCollection) throws IOException {
 	File bz2File = new File(absolutePathToCollection, name + COMPRESSED_FILE_EXTENSION);
-	FileInputStream bz2InputStream = new FileInputStream(bz2File);
-	ByteBufferInputStream byteBufferInputStream = ByteBufferInputStream.map(bz2InputStream.getChannel(), MapMode.READ_ONLY);
-	bz2InputStream.close();
+	bz2InputStream = new FileInputStream(bz2File);
+
+	if (bz2InputStream.read() != 'B' || bz2InputStream.read() != 'Z' || bz2InputStream.read() != 'h') {
+	    bz2InputStream.close();
+	    throw new IllegalArgumentException(bz2File.getAbsolutePath() + " doesn't have bzip2 header!");
+	}
+	uncompressedBlockSize = bz2InputStream.read() - '0';
+	if (uncompressedBlockSize < 0 || uncompressedBlockSize > 9) {
+	    bz2InputStream.close();
+	    throw new IllegalArgumentException(bz2File.getAbsolutePath() + " has a invalid block size byte.");
+	}
+	uncompressedBlockSize *= 100 * 1024; // This is weird.  The uncompressed blocks can be bigger than multiples of 100000.
+
+	FileChannel bz2FileChannel = bz2InputStream.getChannel();
 
 	File blockOffsetsFile = new File(absolutePathToCollection, name + BLOCK_OFFSETS_EXTENSION);
-	FileInputStream blockOffsetsDataInput = new FileInputStream(blockOffsetsFile);
-	init(byteBufferInputStream, blockOffsetsDataInput);
-	blockOffsetsDataInput.close();
+	InputStream blockOffsetsInputStream = new FileInputStream(blockOffsetsFile);
+	init(bz2FileChannel, blockOffsetsInputStream, uncompressedBlockSize);
+	blockOffsetsInputStream.close();
     }
 
-    public void init(final ByteBufferInputStream byteBufferInputStream, InputStream blockOffsetsInputStream) throws IOException {
-	this.byteBufferInputStream = byteBufferInputStream;
-	
+    public void init(FileChannel bz2FileChannel, InputStream blockOffsetsInputStream, int uncompressedBlockSize) throws IOException {
+	this.bz2FileChannel = bz2FileChannel;
+
 	DataInputStream blockOffsetsDataInput = new DataInputStream(blockOffsetsInputStream);
 	try {
 	    blockOffsets = (BlockOffsets) BinIO.loadObject(blockOffsetsDataInput);
 	} catch (ClassNotFoundException e) {
 	    throw new RuntimeException("BinIO.loadObject() threw:" + e);
 	}
+
+	this.uncompressedBlockSize = uncompressedBlockSize;
+
+	blockCache = new BlockCache(new BlockCache.BlockReader() {
+	    @Override
+	    public int readBlock(long blockIndex, byte[] buffer) throws IOException {
+		return uncompressBlock(blockIndex, buffer);
+	    }
+	}, blockOffsets.getBlockCount() - 1, uncompressedBlockSize, 1024);
     }
 
     @Override
     public long size() {
-	return blockOffsets.getRecordCount();
+	return blockOffsets.getLastDocId();
     }
 
     @Override
@@ -120,7 +127,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	}
 	time = System.currentTimeMillis() - time;
 	LOGGER.debug("stream(" + index + ") took " + time + "ms.");
-	
+
 	if (inputStream == null) {
 	    inputStream = new ByteArrayInputStream(ZERO_BYTE_BUFFER);
 	}
@@ -151,194 +158,165 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	return documentFactory;
     }
 
-    private InputStream getInputStreamStartingAtDocStart(long docId) throws IOException {
-	long probableBlockOffsetIndex;
-	
-	Long cachedBlockOffsetIndex = docIdToBlockCache.get(docId);
-	if (cachedBlockOffsetIndex != null) {
-	    probableBlockOffsetIndex = cachedBlockOffsetIndex.longValue();
-	} else {
-	    // When/If the BZip2 block start marker occurs naturally in the
-	    // compressed data there will be blockOffsets entries that aren't
-	    // actually start of block. They are very rare.
-	    probableBlockOffsetIndex = blockOffsets.getBlockIndex(docId);
-	}
-
-	if (probableBlockOffsetIndex < 0) {
-	    // docId is smaller that the first doc in the collection
-	    // or cached as not found.
+    private InputStream getInputStreamStartingAtDocStart(long requiredDocId) throws IOException {
+	if (requiredDocId > blockOffsets.getLastDocId()) {
 	    return null;
 	}
-	
-	UncompressedInputStream uncompressedInputStream = getThreadsUncompressedInputStream();
+	final long blockIndex = blockOffsets.getBlockIndex(requiredDocId);
 
-	int retries = 3;
-	while (retries > 0) {
-	    uncompressedInputStream.setCompressedPosition(blockOffsets.getBlockStartOffset(probableBlockOffsetIndex));
-	    final BufferedInputStream bis = new BufferedInputStream(uncompressedInputStream);
-	    
-	    PositionResult result = positionInputStreamAtDocStart(bis, docId, probableBlockOffsetIndex == 0);
-	    switch (result) {
-	    case FOUND:
-		long conservitiveBlocksReadCount = (uncompressedInputStream.getUncompressedBytesReadSinceLastSetCompressedPosition() / UNCOMPRESSED_BLOCK_SIZE) - 1;
-		if (conservitiveBlocksReadCount > 0) {
-		    probableBlockOffsetIndex += conservitiveBlocksReadCount;
-		}
-		if (probableBlockOffsetIndex >= blockOffsets.getBlockCount()) {
-		    probableBlockOffsetIndex = blockOffsets.getBlockCount() - 1;
-		}
-		docIdToBlockCache.put(docId, probableBlockOffsetIndex);
-		return new InputStream() {
-		    private int b;
-
-		    // Only read up to record delimiter.
-		    @Override
-		    public int read() throws IOException {
-			if (b != -1) {
-			    b = bis.read();
-			    if (b == BySubjectRecord.RECORD_DELIMITER) {
-				b = -1;
-			    }
-			}
-			return b;
-		    }
-		    
-		    @Override
-		    public void close() throws IOException {
-		        super.close();
-		        bis.close();
-		        //threadLocalUncompressedInputStream.remove();
-		    }
-		};
-	    case NOT_FOUND:
-		docIdToBlockCache.put(docId, -1l);
-		return null;
-	    case TRY_PREVIOUS_BLOCK:
-		LOGGER.info("got TRY_PREVIOUS_BLOCK for doc id:" + docId);
-		retries--;
-		probableBlockOffsetIndex--;
-		if (probableBlockOffsetIndex < 0) {
-		    docIdToBlockCache.put(docId, -1l);
-		    return null;
-		}
-		break;
-	    default:
-		docIdToBlockCache.put(docId, -1l);
-		throw new IllegalStateException("Don't know what to do with a " + result + " got while looking for docId" + docId);
-	    }
+	if (blockIndex == -1 || blockIndex >= blockOffsets.getBlockCount()) {
+	    return null;
 	}
-	docIdToBlockCache.put(docId, -1l);
+
+	int[] recordStartOffset = { -1 };
+	long currentDocId = getNextDocId(blockIndex, recordStartOffset);
+
+	if (currentDocId > requiredDocId) {
+	    // The first doc id in the block is bigger than the
+	    // requiredDocId
+	    LOGGER.warn("The first doc id(" + currentDocId + ") in the block(" + blockIndex + ") is bigger than the requiredDocId(" + requiredDocId
+		    + ").  This maybe an error in the bySubject.blockOffsets file.");
+	    return null;
+	}
+
+	while (currentDocId != -1 && currentDocId < requiredDocId) {
+	    currentDocId = getNextDocId(blockIndex, recordStartOffset);
+	}
+
+	if (currentDocId == requiredDocId) {
+	    // Found.
+	    return blockCache.getInputStream(blockIndex, recordStartOffset[0]);
+	}
+
+	if (currentDocId == -1 && recordStartOffset[0] == -1) {
+	    // There are no docIds in this block.
+	    LOGGER.warn("There are no docIds in this block(" + blockIndex + "). RequiredDocId(" + requiredDocId
+		    + "). This maybe an error in the bySubject.blockOffsets file.");
+	}
+	// Not found.
 	return null;
     }
 
-    private synchronized UncompressedInputStream getThreadsUncompressedInputStream() {
-	UncompressedInputStream uncompressedInputStream = threadToUncompressedInputStreamMap.get(Thread.currentThread());
-	if (uncompressedInputStream == null) {
-	    uncompressedInputStream = new UncompressedInputStream(byteBufferInputStream.copy());
-	    threadToUncompressedInputStreamMap.put(Thread.currentThread(), uncompressedInputStream);
+    private int uncompressBlock(long blockIndex, byte[] uncompressedBuffer) throws IOException {
+	final long blockStartBitOffset = blockOffsets.getBlockStartBitOffset(blockIndex);
+	final long blockEndBitOffset = blockOffsets.getBlockStartBitOffset(blockIndex + 1);
+
+	final long blockStartByteOffset = blockStartBitOffset / 8;
+	final int blockStartSkipBits = (int) (blockStartBitOffset % 8);
+	final long blockEndByteOffset = blockEndBitOffset / 8;
+
+	final MappedByteBuffer blockMappedByteBuffer = bz2FileChannel.map(MapMode.READ_ONLY, blockStartByteOffset,
+		(blockEndByteOffset - blockStartByteOffset) + 1);
+
+	final ByteBufferInputStream blockInputStream = new ByteBufferInputStream(blockMappedByteBuffer);
+	final BZip2BitInputStream blockBitInputStream = new BZip2BitInputStream(blockInputStream);
+	blockBitInputStream.readBits(blockStartSkipBits);
+
+	/* Read block-header or end-of-stream marker */
+	final int marker1 = blockBitInputStream.readBits(24);
+	final int marker2 = blockBitInputStream.readBits(24);
+
+	if (marker1 == BZip2Constants.BLOCK_HEADER_MARKER_1 && marker2 == BZip2Constants.BLOCK_HEADER_MARKER_2) {
+	    // System.err.println("Decompressing block " + blockIndex + " S:" +
+	    // blockStartBitOffset + " E:" + blockEndBitOffset);
+	    // System.err.flush();
+	    final BZip2BlockDecompressor blockDecompressor = new BZip2BlockDecompressor(blockBitInputStream, uncompressedBlockSize);
+	    return blockDecompressor.read(uncompressedBuffer, 0, uncompressedBlockSize);
+	} else if (marker1 == BZip2Constants.STREAM_END_MARKER_1 && marker2 == BZip2Constants.STREAM_END_MARKER_2) {
+	    throw new IllegalArgumentException("End of BZip2 marker at bit " + blockStartBitOffset);
+	} else {
+	    throw new IllegalStateException("Not a BZip2 block header at bit " + blockStartBitOffset);
 	}
-	return uncompressedInputStream;
     }
 
-    private static final int BYTE_BUFFER_LENGTH = 32;
+    /**
+     * @param blockIndex
+     *            The index of the block we are looking for the next DocId in.
+     * @param startAtByteIndex
+     *            The current byte index in the block
+     * @return The next docId. -1 if there are no more doc starts.
+     * @throws IllegalStateException
+     *             On corrupt record starts.
+     * @throws IOException
+     *             On failing to read blocks.
+     */
+    private long getNextDocId(long blockIndex, int[] startAtByteIndex) throws IllegalStateException, IOException {
+	BlockCache.Block block = blockCache.getBlock(blockIndex);
 
-    private enum PositionResult {
-	FOUND, NOT_FOUND, TRY_PREVIOUS_BLOCK, TRY_NEXT_BLOCK
-    };
+	int recordDelimiterIndex = startAtByteIndex[0];
 
-    private PositionResult positionInputStreamAtDocStart(BufferedInputStream is, long docId, boolean atRecordStart) throws IOException {
-	byte[] byteBuffer = new byte[BYTE_BUFFER_LENGTH];
+	byte[] blockBytes = block.getBytes();
+	int blockLength = block.getLength();
 
-	int recordCount = 0;
-	int totalBytesRead = 0;
-
-	if (!atRecordStart) {
-	    totalBytesRead = readTillNextRecordStart(is);
-	    if (totalBytesRead < 0) {
-		return PositionResult.NOT_FOUND;
+	if (blockIndex != 0 || recordDelimiterIndex != -1) { // First record in
+							     // first block
+							     // check.
+	    if (recordDelimiterIndex == -1) {
+		recordDelimiterIndex++;
+	    }
+	    while (recordDelimiterIndex < blockLength && blockBytes[recordDelimiterIndex] != BySubjectRecord.RECORD_DELIMITER) {
+		recordDelimiterIndex++;
 	    }
 	}
 
-	PositionResult result = null;
-	do {
-	    is.mark(BYTE_BUFFER_LENGTH);
-
-	    // Expect to read a long as a string terminated with a tab.
-	    int b;
-	    int bytesRead = 0;
-	    while (true) {
-		b = is.read();
-		totalBytesRead++;
-		if (b < 0) {
-		    return PositionResult.NOT_FOUND;
-		}
-		if (b >= '0' && b <= '9') {
-		    byteBuffer[bytesRead++] = (byte) b;
-		    if (bytesRead == byteBuffer.length) {
-			throw new IllegalStateException("Doc ID too long. Record started with " + new String(byteBuffer, 0, bytesRead));
-		    }
-		} else if (b == BySubjectRecord.FIELD_DELIMITER) {
-		    break;
-		} else {
-		    throw new IllegalStateException("Unexpected byte in doc ID >" + b + "<. Record started with " + new String(byteBuffer, 0, bytesRead));
-		}
-	    }
-
-	    String readDocIdString = new String(byteBuffer, 0, bytesRead);
-	    long readDocId = Long.parseLong(readDocIdString);
-
-	    recordCount++;
-
-	    if (readDocId > docId) {
-		is.reset();
-		if (recordCount == 1) {
-		    // The first record has an Doc ID greater that the one we
-		    // are looking for.
-		    result = PositionResult.TRY_PREVIOUS_BLOCK;
-		} else {
-		    result = PositionResult.NOT_FOUND;
-		}
-	    } else if (readDocId == docId) {
-		is.reset();
-		result = PositionResult.FOUND;
-	    } else if (totalBytesRead > UNCOMPRESSED_BLOCK_SIZE * 10) {
-		result = PositionResult.NOT_FOUND;
-	    } else {
-		bytesRead = readTillNextRecordStart(is);
-		if (bytesRead < 0) {
-		    result = PositionResult.NOT_FOUND;
-		} else {
-		    totalBytesRead += bytesRead;
-		    if (totalBytesRead > UNCOMPRESSED_BLOCK_SIZE * 20) {
-			result = PositionResult.TRY_NEXT_BLOCK;
-		    }
-		}
-	    }
-	} while (result == null);
-
-	if (totalBytesRead > UNCOMPRESSED_BLOCK_SIZE * 2) {
-	    float blocksRead = (float) totalBytesRead / UNCOMPRESSED_BLOCK_SIZE;
-	    LOGGER.info("For docId " + docId + " had to read " + blocksRead + " blocks before PositionResult was set to " + result);
+	if (recordDelimiterIndex == blockLength) {
+	    // No RECORD_DELIMITER found after startAtByteIndex.
+	    return -1;
 	}
 
-	return result;
+	// recordDelimiterIndex points to the RECORD_DELIMITER before the next
+	// record or -1 for the first record of the first block)
+
+	int docIdDigitIndex = recordDelimiterIndex + 1;
+	long currentDocId = 0;
+	while (docIdDigitIndex < blockLength && blockBytes[docIdDigitIndex] >= '0' && blockBytes[docIdDigitIndex] <= '9') {
+	    currentDocId *= 10;
+	    currentDocId += blockBytes[docIdDigitIndex] - '0';
+	    docIdDigitIndex++;
+	}
+
+	int docIdLength = docIdDigitIndex - recordDelimiterIndex - 1;
+
+	if (docIdDigitIndex == blockLength) {
+	    // DocId spans blocks or last RECORD_DELIMITER
+	    block = blockCache.getBlock(blockIndex + 1);
+	    if (block == null) {
+		// Last RECORD_DELIMITER.
+		return -1;
+	    }
+	    blockBytes = block.getBytes();
+	    int nextBlockLength = block.getLength();
+	    docIdDigitIndex = 0;
+
+	    while (docIdDigitIndex < nextBlockLength && blockBytes[docIdDigitIndex] >= '0' && blockBytes[docIdDigitIndex] <= '9') {
+		currentDocId *= 10;
+		currentDocId += blockBytes[docIdDigitIndex] - '0';
+		docIdDigitIndex++;
+	    }
+	    docIdLength += docIdDigitIndex;
+	}
+
+	if (blockBytes[docIdDigitIndex] != BySubjectRecord.FIELD_DELIMITER) {
+	    throw new IllegalStateException("Expecting field delimiter but found byte>" + blockBytes[docIdDigitIndex] + "<. Record started with "
+		    + new String(blockBytes, recordDelimiterIndex + 1, docIdDigitIndex));
+	}
+
+	if (docIdLength == 0) {
+	    throw new IllegalStateException("Zero length docId found!");
+	}
+
+	// Success.
+	startAtByteIndex[0] = recordDelimiterIndex + 1;
+	return currentDocId;
     }
 
-    private int readTillNextRecordStart(InputStream is) throws IOException {
-	int b;
-	int byteCount = 0;
-	while ((b = is.read()) != -1) {
-	    byteCount++;
-	    if (b == BySubjectRecord.RECORD_DELIMITER) {
-		return byteCount;
-	    }
-	}
-	return -byteCount;
-    }
-    
     @Override
     public void close() throws IOException {
-        super.close();
+	super.close();
+	bz2FileChannel.close();
+	if (bz2InputStream != null) {
+	    bz2InputStream.close();
+	}
     }
 
     public static void main(String[] args) throws IOException {

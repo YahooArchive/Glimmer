@@ -52,7 +52,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     public static final String EXTRA_RESOURCES = "extraResources";
 
     enum Counters {
-	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
+	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE, WRITTEN_RESOURCES_CACHE_HIT
     }
 
     public static enum TupleElementName {
@@ -83,7 +83,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	} else {
 	    LOG.info("No TupleFilter given. Processing all tuples.");
 	}
-	
+
 	extraResources = conf.getStrings(EXTRA_RESOURCES);
     };
 
@@ -95,7 +95,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException,
 	    InterruptedException {
 
-	if (extraResources != null) {
+	if (extraResources != null && context.getTaskAttemptID().getTaskID().getId() == 0) {
 	    // Add extra resources.
 	    // These end up in the 'all' resources file so get given a Doc ID
 	    // even if they don't occur in the data.
@@ -201,6 +201,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    context.getCounter(Counters.UNEXPECTED_PREDICATE_TYPE).increment(1l);
 	    return;
 	}
+
 	context.write(new Text(tuple.predicate.text), new Text(TupleElementName.PREDICATE.name()));
 	predicateObjectContextDot.append(tuple.predicate.n3);
 

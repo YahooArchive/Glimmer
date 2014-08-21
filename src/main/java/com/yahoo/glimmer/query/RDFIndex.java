@@ -79,7 +79,7 @@ public class RDFIndex {
     public final static int MAX_STEMMING = 1024;
 
     private final static String TYPE_FEILD_NAME = Util.encodeFieldName(RDF.TYPE.toString());
-    
+
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
 
     private final static String ALIGNMENT_INDEX_NAME = "alignment";
@@ -88,8 +88,9 @@ public class RDFIndex {
     private final static String PREDICATE_INDEX_KEY = "predicate";
     private final static String OBJECT_INDEX_KEY = "object";
     private final static String CONTEXT_INDEX_KEY = "context";
-    private static final String[] HORIZONTAL_INDECIES = new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY, CONTEXT_INDEX_KEY};
-    private static final String[] MANDITORY_HORIZONTAL_INDECIES = new String[] {PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY};
+    private static final String[] HORIZONTAL_INDECIES = new String[] { SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY,
+	    CONTEXT_INDEX_KEY };
+    private static final String[] MANDITORY_HORIZONTAL_INDECIES = new String[] { PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY };
 
     private final String indexName;
     /** The query engine. */
@@ -132,7 +133,7 @@ public class RDFIndex {
 
     public RDFIndex(String indexName, Context context) throws RDFIndexException {
 	this.indexName = indexName;
-	
+
 	File kbRootPath = context.getKbRootPath();
 	if (kbRootPath == null) {
 	    throw new IllegalArgumentException("path to knowledge base root is not set.");
@@ -233,7 +234,7 @@ public class RDFIndex {
 		throw new IllegalStateException("No " + indexKey + " index found.");
 	    }
 	}
-	
+
 	if (!indexMap.containsKey(CONTEXT_INDEX_KEY)) {
 	    LOGGER.info("No context index found.");
 	}
@@ -246,8 +247,7 @@ public class RDFIndex {
 	    LOGGER.info("Loading frequencies from " + filename);
 	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, objectIndex.numberOfTerms);
 	    if (frequencies.size64() != objectIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but objectIndex.numberOfDocuments is "
-			+ objectIndex.numberOfDocuments);
+		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but objectIndex.numberOfDocuments is " + objectIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException("Failed to load frequences for objectText index from " + filename, e);
@@ -277,7 +277,7 @@ public class RDFIndex {
 
 	// We need to maintain insertion order and test inclusion.
 	Map<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
-	
+
 	for (String indexKey : HORIZONTAL_INDECIES) {
 	    if (indexMap.containsKey(indexKey)) {
 		fieldNameSuffixToFieldNameOrderedMap.put(indexKey, indexKey);
@@ -339,10 +339,10 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, OBJECT_INDEX_KEY,
-		termProcessors, allResourcesToIds);
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, OBJECT_INDEX_KEY, termProcessors,
+		allResourcesToIds);
     }
-    
+
     public String getIndexName() {
 	return indexName;
     }
@@ -447,10 +447,10 @@ public class RDFIndex {
 	    }
 
 	    if (index.numberOfDocuments != documentCollectionSize) {
-		throw new IllegalArgumentException("Index " + index + " has " + index.numberOfDocuments + " documents, but the document collection has size "
-			+ documentCollectionSize);
+		LOGGER.warn("Index " + index + " has " + index.numberOfDocuments + " documents, but the document collection has size " + documentCollectionSize
+			+ ". This shouldn't be if the .blockOffsets file was produced by the MR job. With the BZip2BlockOffsetsTool the document collection will be slightly smaller.");
 	    }
-	    
+
 	    setTermMapDumpFile(index, indexBasename);
 
 	    name2Index.put(index.field != null ? index.field : indexBasename, index);
@@ -532,8 +532,8 @@ public class RDFIndex {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
 	return new WOOScorer(context.getK1(), bByIndex, objectTermMap, frequencies, objectIndex.sizes, (double) objectIndex.numberOfOccurrences
-		/ objectIndex.numberOfDocuments, objectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
-		documentPriors, context.getMaxNumberOfDieldsNorm());
+		/ objectIndex.numberOfDocuments, objectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(), documentPriors,
+		context.getMaxNumberOfDieldsNorm());
     }
 
     /**

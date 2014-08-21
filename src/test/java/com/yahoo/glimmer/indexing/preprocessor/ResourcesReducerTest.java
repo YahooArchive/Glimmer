@@ -33,17 +33,23 @@ import org.junit.Test;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
 import com.yahoo.glimmer.util.BySubjectRecord;
-
+import com.yahoo.glimmer.util.BySubjectRecord.BySubjectRecordException;
 
 public class ResourcesReducerTest {
     private Mockery context;
     private Reducer<Text, Text, Text, Object>.Context mrContext;
     private Counter duplicateMatchCounter;
+    private Counter keysCounter;
+    private Counter valuesCounter;
+    private Counter keySubjectCounter;
+    private Counter keyPredicateCounter;
+    private Counter keyObjectCounter;
+    private Counter keyContextCounter;
 
-    
     public static class OutputCountMatcher extends BaseMatcher<OutputCount> {
 	private final OUTPUT output;
 	private final int count;
+
 	public OutputCountMatcher(OUTPUT output, int count) {
 	    super();
 	    this.output = output;
@@ -64,17 +70,16 @@ public class ResourcesReducerTest {
 	    desc.appendText("OutputCount matching " + output + ", " + count);
 	}
     }
-    
+
     public static class BySubjectRecordMatcher extends BaseMatcher<BySubjectRecord> {
 	private BySubjectRecord expectedRecord;
-	
-	public BySubjectRecordMatcher set(String string) {
+
+	public BySubjectRecordMatcher set(String string) throws BySubjectRecordException {
 	    expectedRecord = new BySubjectRecord();
 	    byte[] bytes = string.getBytes();
-	    expectedRecord.parse(bytes, 0, bytes.length);
+	    expectedRecord.readFrom(bytes, 0, bytes.length);
 	    return this;
 	}
-	
 
 	@Override
 	public boolean matches(Object object) {
@@ -86,7 +91,7 @@ public class ResourcesReducerTest {
 	    desc.appendText("BySubjectRecord matching " + expectedRecord);
 	}
     }
-    
+
     @SuppressWarnings("unchecked")
     @Before
     public void before() {
@@ -94,15 +99,25 @@ public class ResourcesReducerTest {
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	mrContext = context.mock(Reducer.Context.class, "mrContext");
 	duplicateMatchCounter = new Counter();
+	keysCounter = new Counter();
+	valuesCounter = new Counter();
+	keySubjectCounter = new Counter();
+	keyPredicateCounter = new Counter();
+	keyObjectCounter = new Counter();
+	keyContextCounter = new Counter();
     }
 
     @Test
-    public void subjectText() throws IOException, InterruptedException {
+    public void subjectText() throws IOException, InterruptedException, BySubjectRecordException {
 	context.checking(new Expectations() {
 	    {
-		one(mrContext).write(
-			with(new TextMatcher("http://some/subject/uri")),
-			with(new OutputCountMatcher(OUTPUT.ALL, 0)));
+		one(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		one(mrContext).write(with(new TextMatcher("http://some/subject/uri")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_SUBJECT);
+		will(returnValue(keySubjectCounter));
 		one(mrContext).write(
 			with(new TextMatcher("http://some/subject/uri")),
 			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/subject/uri\t"
@@ -116,8 +131,7 @@ public class ResourcesReducerTest {
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
-	Iterable<Text> values = new TextReuseIterable(
-		"<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
+	Iterable<Text> values = new TextReuseIterable("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
 		"<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .",
 		"<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .",
 		"<http://some/predicate/uri/4> \"Duplicate value\" <http://some/context/uri4> .",
@@ -126,12 +140,23 @@ public class ResourcesReducerTest {
 	reducer.reduce(new Text("http://some/subject/uri"), values, mrContext);
 	context.assertIsSatisfied();
 	assertEquals(1l, duplicateMatchCounter.getValue());
+	assertEquals(1l, keysCounter.getValue());
+	assertEquals(5l, valuesCounter.getValue());
+	assertEquals(4l, keySubjectCounter.getValue());
+	assertEquals(0l, keyPredicateCounter.getValue());
+	assertEquals(0l, keyObjectCounter.getValue());
     }
 
     @Test
     public void predicateText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_PREDICATE);
+		will(returnValue(keyPredicateCounter));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.PREDICATE, 2)));
 	    }
@@ -142,56 +167,97 @@ public class ResourcesReducerTest {
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
 	context.assertIsSatisfied();
+	assertEquals(0l, duplicateMatchCounter.getValue());
+	assertEquals(1l, keysCounter.getValue());
+	assertEquals(2l, valuesCounter.getValue());
+	assertEquals(0l, keySubjectCounter.getValue());
+	assertEquals(2l, keyPredicateCounter.getValue());
+	assertEquals(0l, keyObjectCounter.getValue());
     }
 
     @Test
     public void objectText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_OBJECT);
+		will(returnValue(keyObjectCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_CONTEXT);
+		will(returnValue(keyContextCounter));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.OBJECT, 2)));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
-	Iterable<Text> values = new TextReuseIterable(
-		"OBJECT",
-		"OBJECT");
+	Iterable<Text> values = new TextReuseIterable("OBJECT", "OBJECT");
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
 	context.assertIsSatisfied();
+	assertEquals(0l, duplicateMatchCounter.getValue());
+	assertEquals(1l, keysCounter.getValue());
+	assertEquals(2l, valuesCounter.getValue());
+	assertEquals(0l, keySubjectCounter.getValue());
+	assertEquals(0l, keyPredicateCounter.getValue());
+	assertEquals(2l, keyObjectCounter.getValue());
+	assertEquals(0l, keyContextCounter.getValue());
     }
 
     @Test
     public void contextText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_CONTEXT);
+		will(returnValue(keyContextCounter));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new OutputCountMatcher(OUTPUT.CONTEXT, 4)));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
-	Iterable<Text> values = new TextReuseIterable(
-		"CONTEXT",
-		"CONTEXT",
-		"CONTEXT",
-		"CONTEXT");
+	Iterable<Text> values = new TextReuseIterable("CONTEXT", "CONTEXT", "CONTEXT", "CONTEXT");
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
 	context.assertIsSatisfied();
+	assertEquals(0l, duplicateMatchCounter.getValue());
+	assertEquals(1l, keysCounter.getValue());
+	assertEquals(4l, valuesCounter.getValue());
+	assertEquals(0l, keySubjectCounter.getValue());
+	assertEquals(0l, keyPredicateCounter.getValue());
+	assertEquals(0l, keyObjectCounter.getValue());
+	assertEquals(4l, keyContextCounter.getValue());
     }
-    
+
     @Test
-    public void predicateObectContextText() throws IOException, InterruptedException {
+    public void predicateObectContextText() throws IOException, InterruptedException, BySubjectRecordException {
 	final Sequence sequence = context.sequence("sequence");
-	context.checking(new Expectations() {{
+	context.checking(new Expectations() {
+	    {
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_SUBJECT);
+		will(returnValue(keySubjectCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_PREDICATE);
+		will(returnValue(keyPredicateCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_OBJECT);
+		will(returnValue(keyObjectCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_CONTEXT);
+		will(returnValue(keyContextCounter));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri1")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		inSequence(sequence);
 		one(mrContext).write(
-			with(new TextMatcher("http://some/resource/uri1")), 
-			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/resource/uri1\t<http://predicate1> <http://object1> <context> ." +
-				"\t<http://predicate2> <http://object2> <context> .\t")));
+			with(new TextMatcher("http://some/resource/uri1")),
+			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/resource/uri1\t<http://predicate1> <http://object1> <context> ."
+				+ "\t<http://predicate2> <http://object2> <context> .\t")));
 		inSequence(sequence);
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri1")), with(new OutputCountMatcher(OUTPUT.PREDICATE, 1)));
 		inSequence(sequence);
@@ -199,77 +265,94 @@ public class ResourcesReducerTest {
 		inSequence(sequence);
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri1")), with(new OutputCountMatcher(OUTPUT.CONTEXT, 1)));
 		inSequence(sequence);
-		
+
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri2")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		inSequence(sequence);
 		one(mrContext).write(
-			with(new TextMatcher("http://some/resource/uri2")), 
-			with(new BySubjectRecordMatcher().set("1\t0\thttp://some/resource/uri2\t<http://predicateX> <http://objectX> <context> ." +
-				"\t<http://predicateY> <http://objectY> <context> .\t")));
+			with(new TextMatcher("http://some/resource/uri2")),
+			with(new BySubjectRecordMatcher().set("1\t0\thttp://some/resource/uri2\t<http://predicateX> <http://objectX> <context> ."
+				+ "\t<http://predicateY> <http://objectY> <context> .\t")));
 		inSequence(sequence);
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
-	
-	Iterable<Text> values = new TextReuseIterable(
-		"PREDICATE",
-		"<http://predicate1> <http://object1> <context> .",
-		"<http://predicate2> <http://object2> <context> .",
-		"OBJECT",
-		"CONTEXT");
+
+	Iterable<Text> values = new TextReuseIterable("PREDICATE", "<http://predicate1> <http://object1> <context> .",
+		"<http://predicate2> <http://object2> <context> .", "OBJECT", "CONTEXT");
 	reducer.reduce(new Text("http://some/resource/uri1"), values, mrContext);
-	
-	values = new TextReuseIterable(
-		"<http://predicateX> <http://objectX> <context> .",
-		"<http://predicateY> <http://objectY> <context> .");
+
+	values = new TextReuseIterable("<http://predicateX> <http://objectX> <context> .", "<http://predicateY> <http://objectY> <context> .");
 	reducer.reduce(new Text("http://some/resource/uri2"), values, mrContext);
-	
+
 	context.assertIsSatisfied();
+	assertEquals(0l, duplicateMatchCounter.getValue());
+	assertEquals(2l, keysCounter.getValue());
+	assertEquals(7l, valuesCounter.getValue());
+	assertEquals(4l, keySubjectCounter.getValue());
+	assertEquals(1l, keyPredicateCounter.getValue());
+	assertEquals(1l, keyObjectCounter.getValue());
+	assertEquals(1l, keyContextCounter.getValue());
     }
-    
+
     @Test
-    public void subjectAndObjectText() throws IOException, InterruptedException {
+    public void subjectAndObjectText() throws IOException, InterruptedException, BySubjectRecordException {
 	context.checking(new Expectations() {
 	    {
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEYS);
+		will(returnValue(keysCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.VALUES);
+		will(returnValue(valuesCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_SUBJECT);
+		will(returnValue(keySubjectCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_OBJECT);
+		will(returnValue(keyObjectCounter));
+		allowing(mrContext).getCounter(ResourcesReducer.Counters.KEY_CONTEXT);
+		will(returnValue(keyContextCounter));
 		one(mrContext).write(with(new TextMatcher("bnodeSubject1")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(
 			with(new TextMatcher("bnodeSubject1")),
-			with(new BySubjectRecordMatcher().set("0\t-1\tbnodeSubject1\t<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .\t"
-				+ "<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .\t")));
+			with(new BySubjectRecordMatcher()
+				.set("0\t-1\tbnodeSubject1\t<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .\t"
+					+ "<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .\t")));
 		one(mrContext).write(with(new TextMatcher("bnodeSubject1")), with(new OutputCountMatcher(OUTPUT.OBJECT, 2)));
 		one(mrContext).write(with(new TextMatcher("http://some/context/uri1")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(with(new TextMatcher("http://some/context/uri1")), with(new OutputCountMatcher(OUTPUT.CONTEXT, 1)));
 		one(mrContext).write(with(new TextMatcher("bnodeSubject2")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
-		one(mrContext).write(
-			with(new TextMatcher("bnodeSubject2")),
+		one(mrContext).write(with(new TextMatcher("bnodeSubject2")),
 			with(new BySubjectRecordMatcher().set("2\t0\tbnodeSubject2\t<http://some/predicate/uri/3> _:bnode3 <http://some/context/uri1> .\t")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
-	reducer.reduce(new Text("bnodeSubject1"), new TextReuseIterable(
-		"<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
-		"OBJECT",
-		"<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .",
-		"OBJECT"
-		), mrContext);
+	reducer.reduce(new Text("bnodeSubject1"), new TextReuseIterable("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
+		"OBJECT", "<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .", "OBJECT"), mrContext);
 	reducer.reduce(new Text("http://some/context/uri1"), new TextReuseIterable("CONTEXT"), mrContext);
 	reducer.reduce(new Text("bnodeSubject2"), new TextReuseIterable("<http://some/predicate/uri/3> _:bnode3 <http://some/context/uri1> ."), mrContext);
-	
+
 	context.assertIsSatisfied();
+	assertEquals(0l, duplicateMatchCounter.getValue());
+	assertEquals(3l, keysCounter.getValue());
+	assertEquals(6l, valuesCounter.getValue());
+	assertEquals(3l, keySubjectCounter.getValue());
+	assertEquals(0l, keyPredicateCounter.getValue());
+	assertEquals(2l, keyObjectCounter.getValue());
+	assertEquals(1l, keyContextCounter.getValue());
     }
 
-    /** The iterator's next() method returns the same Text object on each invocation but with 
-     * but a different value.  Object reuse is common in Hadoop. This is used to simulate that.
+    /**
+     * The iterator's next() method returns the same Text object on each
+     * invocation but with but a different value. Object reuse is common in
+     * Hadoop. This is used to simulate that.
+     * 
      * @author tep
      */
     private static class TextReuseIterable implements Iterable<Text> {
 	private final List<String> strings;
 
-	public TextReuseIterable(String ... strings) {
+	public TextReuseIterable(String... strings) {
 	    this.strings = Arrays.asList(strings);
 	}
-	
+
 	@Override
 	public Iterator<Text> iterator() {
 	    return new Iterator<Text>() {
@@ -279,6 +362,7 @@ public class ResourcesReducerTest {
 		    iterator = strings.iterator();
 		    reusedTextObject = new Text();
 		}
+
 		@Override
 		public boolean hasNext() {
 		    return iterator.hasNext();

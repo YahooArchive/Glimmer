@@ -157,7 +157,7 @@ public class ComputeHashTool extends Configured implements Tool {
 //		LOGGER.info("\tNumber of elements is " + numElements + " found in " + timeToGetSize / 1000 + " seconds");
 //	    }
 //	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, numElements, TransformationStrategies.prefixFreeUtf16());
-	    unsignedHash = new HollowTrieMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
+	    unsignedHash = new HollowTrieMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf32());
 	    LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
 	    writeMapToFile(unsignedHash, fs, unsigendPath);
 	} else {

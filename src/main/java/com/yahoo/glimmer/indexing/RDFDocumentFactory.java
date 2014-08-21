@@ -30,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLClass;
@@ -181,7 +182,8 @@ public abstract class RDFDocumentFactory {
     public Long lookupResource(String key) {
 	Long value = resourcesHashFunction.get(key);
 	if (value != null && value < 0) {
-	    throw new RuntimeException("Negative hash value for " + key);
+	    // throw new RuntimeException("Negative hash value for " + key);
+	    throw new ResourceHashLookupException("Resource lookup resulted in a negative value.", key, value);
 	}
 	return value;
     }
@@ -289,18 +291,38 @@ public abstract class RDFDocumentFactory {
     }
 
     public static enum RdfCounters {
-	EMPTY_LINES, EMPTY_DOCUMENTS, BLACKLISTED_TRIPLES, UNINDEXED_PREDICATE_TRIPLES, RDF_TYPE_TRIPLES, INDEXED_TRIPLES, PARSE_ERROR, ONTOLOGY_SUPER_TYPE_NOT_IN_HASH
+	EMPTY_LINES, EMPTY_DOCUMENTS, BLACKLISTED_TRIPLES, UNINDEXED_PREDICATE_TRIPLES, RDF_TYPE_TRIPLES, INDEXED_TRIPLES, PARSE_ERROR, ONTOLOGY_SUPER_TYPE_NOT_IN_HASH, PREDICATES_NOT_IN_HASH, CONTEXT_NOT_IN_HASH, OBJECT_NOT_IN_HASH, ANCESTOR_OBJECT_NOT_IN_HASH
     }
 
     public void incrementCounter(RdfCounters counter, int by) {
 	counters.findCounter(counter).increment(by);
     }
 
-    public Counters getCounters() {
-	return counters;
+    public Counter getCounter(RdfCounters counter) {
+	return counters.findCounter(counter);
     }
 
     public String getInputStreamEncodeing() {
 	return "UTF-8";
+    }
+    
+    public static class ResourceHashLookupException extends RuntimeException {
+	private static final long serialVersionUID = -7483398161700656105L;
+	private final String key;
+	private final Long value;
+
+	public ResourceHashLookupException(String message, String key, Long value) {
+	    super(message);
+	    this.key = key;
+	    this.value = value;
+	}
+	
+	public String getKey() {
+	    return key;
+	}
+	
+	public Long getValue() {
+	    return value;
+	}
     }
 }

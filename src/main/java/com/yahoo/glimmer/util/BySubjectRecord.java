@@ -53,70 +53,95 @@ public class BySubjectRecord {
 	}
     }
 
-    public boolean parse(final byte[] bytes, final int start, final int end) {
-	return parse(bytes, start, end, CHARSET);
+    public void readFrom(final byte[] bytes, final int start, final int end) throws BySubjectRecordException {
+	readFrom(bytes, start, end, CHARSET);
     }
 
-    public boolean parse(final byte[] bytes, final int start, final int end, final Charset charset) {
+    public void readFrom(final byte[] bytes, final int start, final int end, final Charset charset) throws BySubjectRecordException {
 	ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes, start, end);
 	try {
-	    return parse(new InputStreamReader(inputStream, charset));
+	    readFrom(new InputStreamReader(inputStream, charset));
 	} catch (IOException e) {
 	    // This shouldn't happen reading from a ByteArrayInputStream.
 	    throw new RuntimeException(e);
 	}
     }
 
-    public boolean parse(Reader reader) throws IOException {
+    /**
+     * 
+     * @param reader
+     * @param sb
+     * @return false on failed to parse.
+     * @throws IOException
+     * @throws ParseException
+     *             on invalid input.
+     */
+    public void readFrom(Reader reader) throws IOException, BySubjectRecordException {
 	if (sb == null) {
 	    sb = new StringBuilder();
 	}
-	return parse(reader, sb);
+	readFrom(reader, sb);
     }
 
-    public boolean parse(Reader reader, StringBuilder sb) throws IOException {
-	readUntil(reader, sb, FIELD_DELIMITER);
+    private void readFrom(Reader reader, StringBuilder sb) throws IOException, BySubjectRecordException {
+	readField(reader, sb);
 	try {
 	    id = Long.parseLong(sb.toString());
 	} catch (NumberFormatException e) {
-	    return false;
+	    throw new BySubjectRecordException("Reading id", e);
 	}
 	if (id < 0) {
-	    throw new IllegalStateException("Negative doc ID:" + id);
+	    throw new BySubjectRecordException("Negative doc ID:" + id);
 	}
 
-	readUntil(reader, sb, FIELD_DELIMITER);
+	readField(reader, sb);
 	try {
 	    previousId = Long.parseLong(sb.toString());
 	} catch (NumberFormatException e) {
-	    return false;
+	    throw new BySubjectRecordException("Reading previousId", e);
 	}
 	if (previousId < -1) {
-	    throw new IllegalStateException("Negative doc previousId:" + previousId);
+	    throw new BySubjectRecordException("Negative doc previousId:" + previousId);
+	}
+	if (previousId >= id) {
+	    throw new BySubjectRecordException("Id:" + id + " is not bigger than previousId:" + previousId);
 	}
 
-	readUntil(reader, sb, FIELD_DELIMITER);
+	readField(reader, sb);
 	subject = sb.toString();
 
 	relations.clear();
-	while (readUntil(reader, sb, FIELD_DELIMITER)) {
+	while (readField(reader, sb)) {
 	    if (sb.length() > 0)
 		relations.add(sb.toString());
 	}
-
-	return true;
     }
 
-    private static boolean readUntil(final Reader reader, final StringBuilder sb, final char stopChar) throws IOException {
+    public static class BySubjectRecordException extends Exception {
+	private static final long serialVersionUID = 2571219720786672147L;
+
+	public BySubjectRecordException(String string) {
+	    super(string);
+	}
+
+	public BySubjectRecordException(String string, Exception e) {
+	    super(string, e);
+	}
+    }
+
+    private static boolean readField(final Reader reader, final StringBuilder sb) throws IOException {
 	sb.setLength(0);
 	int c;
-	while ((c = reader.read()) != stopChar) {
-	    if (c == -1) {
-		return false;
+	while ((c = reader.read()) != -1) {
+	    if (c == FIELD_DELIMITER) {
+		return true;
+	    }
+	    if (c == RECORD_DELIMITER) {
+		break;
 	    }
 	    sb.append((char) c);
 	}
-	return true;
+	return false;
     }
 
     public long getId() {
@@ -147,6 +172,10 @@ public class BySubjectRecord {
 
     public void setSubject(String subject) {
 	this.subject = subject;
+    }
+    
+    public String getRelation(int index) {
+	return relations.get(index);
     }
 
     public Iterable<String> getRelations() {
@@ -185,7 +214,7 @@ public class BySubjectRecord {
 			// case where in the last call the last char returned
 			// was the last char of the current relation.
 			buffer[bufferIndex++] = '\t';
-			
+
 			relationsIndex++;
 			relationIndex = 0;
 		    } else {
@@ -196,7 +225,7 @@ public class BySubjectRecord {
 			if (bufferIndex == bufferEndIndex) {
 			    return len;
 			}
-			
+
 			relationsIndex++;
 			relationIndex = 0;
 
@@ -243,7 +272,6 @@ public class BySubjectRecord {
 	    writer.write(relation);
 	    writer.write(FIELD_DELIMITER);
 	}
-	writer.write(RECORD_DELIMITER);
     }
 
     @Override

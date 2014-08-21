@@ -20,12 +20,15 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.ResourceHashLookupException;
 
 /**
  * A RDF document.
@@ -36,6 +39,8 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
  */
 
 class HorizontalDocument extends RDFDocument {
+    private static final Log LOG = LogFactory.getLog(HorizontalDocument.class);
+
     /*
      * The fields objects, predicates & contexts are used in 'parallel' So the
      * value at index I from the three lists refers to the same relation. If the
@@ -120,17 +125,24 @@ class HorizontalDocument extends RDFDocument {
 		factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
 	    }
 	    
-	    String predicateId = factory.lookupResource(predicate, true);
-	    if (predicateId == null) {
-		throw new IllegalStateException("Predicate " + predicate + " not in resources hash function!");
+	    String predicateId;
+	    try {
+		predicateId = factory.lookupResource(predicate, true);
+	    } catch (ResourceHashLookupException rhle) {
+		factory.incrementCounter(RdfCounters.PREDICATES_NOT_IN_HASH, 1);
+		LOG.info("Predicate not in hash:" + predicate);
+		continue;
 	    }
 
 	    String contextId = NO_CONTEXT;
 	    if (factory.isWithContexts() && relation.getContext() != null) {
 		if (relation.getContext() instanceof Resource || relation.getContext() instanceof BNode) {
-		    contextId = factory.lookupResource(relation.getContext().toString(), true);
-		    if (contextId == null) {
-			throw new IllegalStateException("Context " + relation.getContext() + " not in resources hash function!");
+		    try {
+			contextId = factory.lookupResource(relation.getContext().toString(), true);
+		    } catch (ResourceHashLookupException rhle) {
+			factory.incrementCounter(RdfCounters.CONTEXT_NOT_IN_HASH, 1);
+			LOG.info("Context not in hash:" + relation.getContext().toString());
+			continue;
 		    }
 		} else {
 		    throw new IllegalStateException("Context " + relation.getContext() + " is not a Resource.");
@@ -138,10 +150,14 @@ class HorizontalDocument extends RDFDocument {
 	    }
 
 	    if (relation.getObject() instanceof Resource || relation.getObject() instanceof BNode) {
-		String objectId = factory.lookupResource(relation.getObject().toString(), true);
-		if (objectId == null) {
-		    throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
-		}
+		String objectId;
+		try {
+		    objectId = factory.lookupResource(relation.getObject().toString(), true);
+		} catch (ResourceHashLookupException rhle) {
+			factory.incrementCounter(RdfCounters.OBJECT_NOT_IN_HASH, 1);
+			LOG.info("Object not in hash:" + relation.getObject().toString());
+			continue;
+		    }
 		objects.add(objectId);
 		predicates.add(predicateId);
 		contexts.add(contextId);

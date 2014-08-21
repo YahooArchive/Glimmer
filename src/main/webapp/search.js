@@ -450,6 +450,9 @@ YUI({
 			}
 			
 			function typeSort(a, b) {
+				if (stats.classes == undefined) {
+					return 0;
+				}
 				var countA = 0;
 				// For very long documents, there is a small chance that the class will existing in the document but not be in the list of classes.
 				if (stats.classes[a] !== undefined) {

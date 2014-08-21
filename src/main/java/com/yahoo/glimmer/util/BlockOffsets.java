@@ -13,26 +13,37 @@ import java.io.Serializable;
 
 public class BlockOffsets implements Serializable {
     private static final long serialVersionUID = 6997859749849192991L;
+    private static final int BZIP2_FOOTER_LENGTH = 6 * 8 + 32; // 6 Stream end
+							       // bytes + 32 bit
+							       // CRC
 
     private final LongBigList firstDocIds;
-    private final LongBigList blockStartOffsets;
-    private final long recordCount;
-    private final long fileSize;
+    private final LongBigList blockStartBitOffsets;
+    private final long docCount;
+    private final long lastDocId;
+    private final long fileSizeInBits;
 
-    public BlockOffsets(LongIterable firstDocIds, LongIterable blockStartOffsets, long recordCount, long fileSize) {
+    public BlockOffsets(LongIterable firstDocIds, LongIterable blockStartBitOffsets, long docCount, long lastDocId, long fileSizeInBits) {
 	this.firstDocIds = new EliasFanoMonotoneLongBigList(firstDocIds);
-	this.blockStartOffsets = new EliasFanoMonotoneLongBigList(blockStartOffsets);
-	this.recordCount = recordCount;
-	this.fileSize = fileSize;
+	this.blockStartBitOffsets = new EliasFanoMonotoneLongBigList(blockStartBitOffsets);
+	if (this.firstDocIds.size64() != this.blockStartBitOffsets.size64()) {
+	    throw new IllegalArgumentException("Number of block starts differs from number of first doc ids.");
+	}
+	if (docCount - 1 > lastDocId) {
+	    throw new IllegalArgumentException("docCount(" + docCount + ") - 1 is greater than the lastDocId(" + lastDocId + ")");
+	}
+	this.docCount = docCount;
+	this.lastDocId = lastDocId;
+	this.fileSizeInBits = fileSizeInBits;
     }
 
-    public long getBlockStartOffset(long index) throws IOException {
-	if (index < blockStartOffsets.size()) {
-	    return blockStartOffsets.getLong(index);
-	} else if (index == blockStartOffsets.size()) {
-	    return fileSize - BlockCompressedDocumentCollection.FOOTER_LENGTH;
+    public long getBlockStartBitOffset(long index) throws IOException {
+	if (index < blockStartBitOffsets.size()) {
+	    return blockStartBitOffsets.getLong(index);
+	} else if (index == blockStartBitOffsets.size()) {
+	    return fileSizeInBits - BZIP2_FOOTER_LENGTH;
 	}
-	return -1;
+	throw new IndexOutOfBoundsException("index (" + index + ") > block count(" + getBlockCount() + ")");
     }
 
     public long getBlockIndex(long docId) {
@@ -54,16 +65,20 @@ public class BlockOffsets implements Serializable {
 	return index;
     }
 
-    public long getRecordCount() {
-	return recordCount;
+    public long getLastDocId() {
+	return lastDocId;
+    }
+    
+    public long getDocCount() {
+	return docCount;
     }
 
-    public long getFileSize() {
-	return fileSize;
+    public long getFileSizeInBits() {
+	return fileSizeInBits;
     }
 
     public long getBlockCount() {
-	return blockStartOffsets.size64();
+	return blockStartBitOffsets.size64();
     }
 
     // Surprisingly there doesn't seem to be a binary search method on
@@ -87,11 +102,13 @@ public class BlockOffsets implements Serializable {
     }
 
     public void printTo(PrintStream ps) {
-	ps.println("Doc count:" + recordCount);
-	ps.println("Bz2 file size:" + fileSize);
-	ps.println("FirstDoc\tBlockStart");
+	ps.println("Doc count:" + docCount);
+	ps.println("Last doc ID:" + lastDocId);
+	ps.println("Block count:" + getBlockCount());
+	ps.println("Bz2 file size (bits):" + fileSizeInBits);
+	ps.println("BlockIndex         FirstDoc       BlockStart");
 	for (long i = 0; i < firstDocIds.size64(); i++) {
-	    ps.printf("%d\t%d\n", firstDocIds.get(i), blockStartOffsets.get(i));
+	    ps.printf("%10d %16d %16d\n", i, firstDocIds.get(i), blockStartBitOffsets.get(i));
 	}
     }
 
@@ -99,48 +116,25 @@ public class BlockOffsets implements Serializable {
 	BinIO.storeObject(this, outputStream);
     }
 
-    public static class BlockOffsetsCallback implements BitSequenceMonitor.Callback {
+    public static class Builder {
 	private final LongBigArrayBigList firstDocIds = new LongBigArrayBigList();
-	private final LongBigArrayBigList startOffsets = new LongBigArrayBigList();
-	private boolean firstDocIdInBlockSet;
-	private long firstDocIdInBlock;
-	private long lastEndOffset;
+	private final LongBigArrayBigList blockStartBitOffsets = new LongBigArrayBigList();
+	private long totalBits;
 
-	private int blockIndex = 0;
-
-	@Override
-	public void sequenceStart(long byteOffset, int bitInByte) {
-	    if (blockIndex > 0) {
-		lastEndOffset = byteOffset;
-	    }
-	    // Save all block start offsets.
-	    // If the record spans multiple blocks we use the same docId for all
-	    // blocks
-	    firstDocIds.add(firstDocIdInBlock);
-	    startOffsets.add(byteOffset);
-	    if (firstDocIdInBlockSet) {
-		firstDocIdInBlockSet = false;
-	    }
-
-	    blockIndex++;
+	public void setBlockStart(long blockStartBitOffset, long docId) {
+	    blockStartBitOffsets.add(blockStartBitOffset);
+	    firstDocIds.add(docId);
 	}
 
-	@Override
-	public void close(long byteOffset) {
-	    if (blockIndex > -1) {
-		lastEndOffset = byteOffset;
-	    }
+	public void close(long totalBits) {
+	    this.totalBits = totalBits;
 	}
 
-	public void setDocId(long id) {
-	    if (!firstDocIdInBlockSet) {
-		firstDocIdInBlockSet = true;
-		firstDocIdInBlock = id;
+	public BlockOffsets build(long docCount, long lastDocId) {
+	    if (totalBits == -1) {
+		throw new IllegalStateException("close() wasn't called!");
 	    }
-	}
-
-	public BlockOffsets getBlockOffsets(long recordCount) {
-	    return new BlockOffsets(firstDocIds, startOffsets, recordCount, lastEndOffset);
+	    return new BlockOffsets(firstDocIds, blockStartBitOffsets, docCount, lastDocId, totalBits);
 	}
     }
 }

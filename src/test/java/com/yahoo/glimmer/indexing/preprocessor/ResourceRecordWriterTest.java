@@ -13,18 +13,15 @@ package com.yahoo.glimmer.indexing.preprocessor;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
-import it.unimi.dsi.io.ByteBufferInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -47,8 +44,9 @@ import org.junit.rules.TemporaryFolder;
 
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
-import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
+import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.glimmer.util.BySubjectRecord.BySubjectRecordException;
 
 public class ResourceRecordWriterTest {
     private Mockery context;
@@ -154,8 +152,15 @@ public class ResourceRecordWriterTest {
 	
 	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("foo", null, 10);
 	InputStream blockOffsetsInputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
-	ByteBufferInputStream byteBufferInputStream = new ByteBufferInputStream(ByteBuffer.wrap(bySubjectBos.toByteArray()));
-	collection.init(byteBufferInputStream, blockOffsetsInputStream);
+	
+	File bySubjectTempFile = File.createTempFile(ResourceRecordWriterTest.class.getSimpleName(), "tmp");
+	FileOutputStream tempFileOutputStream = new FileOutputStream(bySubjectTempFile);
+	bySubjectBos.writeTo(tempFileOutputStream);
+	tempFileOutputStream.flush();
+	tempFileOutputStream.close();
+	
+	FileInputStream bySubjectFileInputStream = new FileInputStream(bySubjectTempFile);
+	collection.init(bySubjectFileInputStream.getChannel(), blockOffsetsInputStream, 100000);
 	blockOffsetsInputStream.close();
 
 	// Size of collection. This is the same as the number of lines written to ALL.
@@ -169,10 +174,11 @@ public class ResourceRecordWriterTest {
 	assertNotNull(documentInputStream);
 	
 	collection.close();
+	bySubjectFileInputStream.close();
     }
     
     @Test
-    public void bySubjectsTest() throws IOException, InterruptedException, NoSuchAlgorithmException {
+    public void bySubjectsTest() throws IOException, InterruptedException, NoSuchAlgorithmException, BySubjectRecordException {
 	FSDataOutputStream bySubjectOs = new FSDataOutputStream(new FileOutputStream(new File(tempDirPath.toUri().getPath(), "bySubject.bz2")), null);
 	FSDataOutputStream bySubjectOffsetsOs = new FSDataOutputStream(new FileOutputStream(new File(tempDirPath.toUri().getPath(), "bySubject.blockOffsets")), null);
 	
@@ -182,8 +188,11 @@ public class ResourceRecordWriterTest {
 	e.will(Expectations.returnValue(bySubjectOffsetsOs));
 
 	e.allowing(subjectOs).write(e.with(new ByteMatcher()), e.with(0), e.with(Expectations.any(Integer.class)));
-	context.checking(e);
 	
+	e.allowing(allOs).write(e.with(new ByteMatcher("all\nall\n", true)), e.with(0), e.with(Expectations.any(Integer.class)));
+	
+	context.checking(e);
+	System.out.println("tempDirPath:" + tempDirPath);
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, tempDirPath, null);
 	
 	BySubjectRecord record = new BySubjectRecord();
@@ -191,7 +200,7 @@ public class ResourceRecordWriterTest {
 	for (long l = 100000 ; l < 200000 ; l += (random.nextInt(19) + 2)) {
 	    record.setId(l);
 	    record.setSubject("Subject:" + Integer.toString(random.nextInt()));
-	    for (int i = 0 ; i < random.nextInt() % 4 ; i++) {
+	    for (int i = 0 ; i < random.nextInt() % 100 ; i++) {
 		record.addRelation("a relation " + Long.toString(random.nextLong()));
 	    }
 	    
@@ -215,7 +224,7 @@ public class ResourceRecordWriterTest {
 	
 	MessageDigest md5Digest = MessageDigest.getInstance("MD5");
 	StringBuilder sb = new StringBuilder();
-	// 8k x 128 byte relations.
+	// 8k x 128 byte relations.  The relation here is just a 128 byte hex string without delimiters.
 	for (int i = 0 ; i < 8192 ; i++) {
 	    md5Digest.update((byte)((i * 1299299) & 0xFF));
 	    byte[] digest = md5Digest.digest();
@@ -245,6 +254,15 @@ public class ResourceRecordWriterTest {
 	afterBigRecord.setSubject("After Big Test Record");
 	writer.write(null, afterBigRecord);
 	
+	OutputCount outputCount = new OutputCount();
+	outputCount.output = OUTPUT.ALL;
+	outputCount.count = 1;
+	Text key = new Text("all");
+	for (int i = 0 ; i < 200205 ; i++) {
+	    writer.write(key,  outputCount);
+	}
+	writer.write(new Text("http://a/key1"), outputCount);
+	
 	writer.close(null);
 
 	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", null, 10);
@@ -254,11 +272,11 @@ public class ResourceRecordWriterTest {
 	assertEquals(-1, collection.stream(99999).read());
 	
 	InputStream documentInputStream = collection.stream(100000);
-	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	record.readFrom(new InputStreamReader(documentInputStream));
 	assertEquals(100000, record.getId());
 	
 	documentInputStream = collection.stream(record.getId());
-	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	record.readFrom(new InputStreamReader(documentInputStream));
 	assertEquals(record.getId(), record.getId());
 
 	record.setPreviousId(3);
@@ -267,16 +285,27 @@ public class ResourceRecordWriterTest {
 	assertEquals(-1, documentInputStream.read());
 
 	documentInputStream = collection.stream(beforeBigRecord.getId());
-	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	record.readFrom(new InputStreamReader(documentInputStream));
 	assertEquals(beforeBigRecord, record);
 	
 	documentInputStream = collection.stream(afterBigRecord.getId());
-	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	record.readFrom(new InputStreamReader(documentInputStream));
 	assertEquals(afterBigRecord, record);
 	
 	documentInputStream = collection.stream(bigRecord.getId());
-	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
-	System.out.println(record.getRelationsCount());
+	record.readFrom(new InputStreamReader(documentInputStream));
+	System.out.println("BigRecord Relation count:" + bigRecord.getRelationsCount());
+	System.out.println("First:" + bigRecord.getRelation(0));
+	System.out.println("Last:" + bigRecord.getRelation(bigRecord.getRelationsCount() - 1));
+	System.out.println("Record Relation count:" + record.getRelationsCount());
+	System.out.println("First:" + record.getRelation(0));
+	System.out.println("Last:" + record.getRelation(record.getRelationsCount() - 1));
+	
+	int limit = bigRecord.getRelationsCount() > record.getRelationsCount() ? record.getRelationsCount() : bigRecord.getRelationsCount();
+	for (int i = 0 ; i < limit ; i++) {
+	    assertEquals("At index " + i, bigRecord.getRelation(i), record.getRelation(i));
+	}
+	
 	assertEquals(bigRecord.getRelationsCount(), record.getRelationsCount());
 	assertEquals(bigRecord, record);
 	

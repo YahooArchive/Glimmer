@@ -20,12 +20,15 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.ResourceHashLookupException;
 
 /**
  * A RDF document.
@@ -36,6 +39,8 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
  */
 
 class VerticalDocument extends RDFDocument {
+    private static final Log LOG = LogFactory.getLog(VerticalDocument.class);
+
     private List<List<String>> fields = new ArrayList<List<String>>();
 
     protected VerticalDocument(VerticalDocumentFactory factory) {
@@ -71,26 +76,40 @@ class VerticalDocument extends RDFDocument {
 		factory.incrementCounter(RdfCounters.UNINDEXED_PREDICATE_TRIPLES, 1);
 		continue;
 	    }
-	    
+
 	    List<String> fieldForPredicate = fields.get(fieldIndex);
 
 	    if (relation.getObject() instanceof Resource || relation.getObject() instanceof BNode) {
 		// Encode the resource URI or bnode ID using the resources hash
-		String objectId = factory.lookupResource(relation.getObject().toString(), true);
-		if (objectId == null) {
-		    throw new IllegalStateException("Object " + relation.getObject().toString() + " not in resources hash function!");
+		String objectId;
+		try {
+		    objectId = factory.lookupResource(relation.getObject().toString(), true);
+		} catch (ResourceHashLookupException rhle) {
+		    factory.incrementCounter(RdfCounters.OBJECT_NOT_IN_HASH, 1);
+		    LOG.info("Object not in hash:" + relation.getContext().toString());
+		    continue;
 		}
+
 		fieldForPredicate.add(objectId);
-		
+
 		if (predicate.equals(RDF.TYPE.toString())) {
-		    // If the predicate is RDF type and the object is a Resource we use the ontology(if set)
+		    // If the predicate is RDF type and the object is a Resource
+		    // we use the ontology(if set)
 		    // to also index all super types.
 		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-		    
+
 		    for (String ancestor : factory.getAncestors(relation.getObject().toString())) {
-			String ancestorId = factory.lookupResource(ancestor, true);
+			String ancestorId;
+			try {
+			    ancestorId = factory.lookupResource(ancestor, true);
+			} catch (ResourceHashLookupException rhle) {
+			    factory.incrementCounter(RdfCounters.ANCESTOR_OBJECT_NOT_IN_HASH, 1);
+			    LOG.info("Ancestor(" + ancestor + ") of " + relation.getObject().toString()
+				    + " not in resources hash function!. Was the same ontology used with the PrepTool?");
+			    continue;
+			}
 			if (ancestorId == null) {
-			    throw new IllegalStateException("Ancestor(" + ancestor + ") of " + relation.getObject().toString() + " not in resources hash function!. Was the same ontology used with the PrepTool?");
+			    throw new IllegalStateException();
 			}
 			fieldForPredicate.add(ancestorId);
 		    }
@@ -114,7 +133,7 @@ class VerticalDocument extends RDFDocument {
 	    factory.incrementCounter(RdfCounters.INDEXED_TRIPLES, 1);
 	}
     }
-    
+
     @Override
     public WordReader content(final int field) throws IOException {
 	factory.ensureFieldIndex(field);

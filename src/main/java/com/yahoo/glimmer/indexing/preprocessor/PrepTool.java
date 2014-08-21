@@ -38,8 +38,10 @@ import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.indexing.OntologyLoader;
 
 public class PrepTool extends Configured implements Tool {
+    private static final int DEFAULT_REDUCER_COUNT = 1;
     public static final String NO_CONTEXTS_ARG = "excludeContexts";
     private static final String ONTOLOGY_ARG = "ontology";
+    private static final String REDUCER_COUNT_ARG = "reducers";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
 
@@ -54,22 +56,21 @@ public class PrepTool extends Configured implements Tool {
 	SimpleJSAP jsap = new SimpleJSAP(PrepTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
 		new Switch(NO_CONTEXTS_ARG, 'C', NO_CONTEXTS_ARG, "Don't process the contexts for each tuple."),
 		new FlaggedOption(ONTOLOGY_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'O', ONTOLOGY_ARG),
+		new FlaggedOption(REDUCER_COUNT_ARG, JSAP.INTEGER_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'r', REDUCER_COUNT_ARG),
 		new UnflaggedOption(INPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
-		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."),
-	});
+		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."), });
 
 	JSAPResult jsapResult = jsap.parse(args);
 	if (!jsapResult.success()) {
 	    System.err.print(jsap.getUsage());
 	    System.exit(1);
 	}
-	
 
 	Configuration config = getConf();
-	
+
 	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
 	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
-	
+
 	// The ontology if any...
 	String ontologyFilename = jsapResult.getString(ONTOLOGY_ARG);
 	if (ontologyFilename != null) {
@@ -77,7 +78,7 @@ public class PrepTool extends Configured implements Tool {
 	    InputStream ontologyInputStream = new FileInputStream(ontologyFilename);
 	    OWLOntology ontology = OntologyLoader.load(ontologyInputStream);
 	    System.out.println("Loaded ontology from " + ontologyFilename + " with " + ontology.getAxiomCount() + " axioms.");
-	    
+
 	    ArrayList<String> ontologyClasses = new ArrayList<String>();
 	    for (OWLClass owlClass : ontology.getClassesInSignature()) {
 		ontologyClasses.add(owlClass.getIRI().toString());
@@ -98,32 +99,44 @@ public class PrepTool extends Configured implements Tool {
 	job.setMapOutputKeyClass(Text.class);
 	job.setMapOutputValueClass(Text.class);
 
-	job.setReducerClass(ResourcesReducer.class);
-	job.setOutputKeyClass(Text.class);
-	job.setOutputValueClass(Object.class);
-	// We assign 'global' ids in the reducer. For this to work, there can be only one.
-	job.setNumReduceTasks(1);
-
-	job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
+	int reducerCount = jsapResult.getInt(REDUCER_COUNT_ARG, DEFAULT_REDUCER_COUNT);
+	job.setNumReduceTasks(reducerCount);
+	if (reducerCount == 1) {
+	    // We assign 'global' ids in the reducer. For this to work, there
+	    // can be only one. But using just one reducer, we run out of local disk space during the
+	    // pre-reduce merge with big data sets like WCC.
+	    
+	    job.setReducerClass(ResourcesReducer.class);
+	    job.setOutputKeyClass(Text.class);
+	    job.setOutputValueClass(Object.class);
+	    job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
+	} else {
+	    /*
+	     * TODO: Take the functionality of the reducer and move it to run on
+	     * the gateway. We then use n identity reducers, the output of which
+	     * will be read and merged as streams on the gateway.
+	     */
+	}
 
 	FileInputFormat.setInputPaths(job, new Path(jsapResult.getString(INPUT_ARG)));
 
 	Path outputDir = new Path(jsapResult.getString(OUTPUT_ARG));
 	FileOutputFormat.setOutputPath(job, outputDir);
-	
 
 	if (!job.waitForCompletion(true)) {
 	    System.err.println("Failed to process tuples from " + jsapResult.getString(INPUT_ARG));
 	    return 1;
 	}
 
-	// We now have:
+	// IF THERE WAS ONLY ONE REDUCER WE NOW HAVE
 	// One file per reducer containing lists of urls(recourses) for
 	// subjects, predicates, objects and contexts.
 	// One file per reducer that contains all resources. subjects +
 	// predicates + objects + contexts.
 	// One file per reducer that contains the subjects + all <predicate>
 	// <object>|"Literal" <context> on that subject.
+	
+	// IF THERE WAS MORE THAN ONE REDUCER WE NOW HAVE N FILES THAT NEED TO BE MERGED ON THE GATEWAY. TODO.
 	
 	return 0;
     }

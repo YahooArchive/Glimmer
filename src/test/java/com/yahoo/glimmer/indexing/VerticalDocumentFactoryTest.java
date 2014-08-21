@@ -80,7 +80,7 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 
 	context.assertIsSatisfied();
 
-	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(4l, factory.getCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
