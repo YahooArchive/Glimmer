@@ -44,17 +44,6 @@
 		</plugins>
 	</build>
 
-	<repositories>
-		<repository>
-			<id>aduna-software</id>
-			<url>http://repo.aduna-software.org/maven2/releases</url>
-		</repository>
-		<repository>
-			<id>nxparser-repo</id>
-			<url>http://nxparser.googlecode.com/svn/snapshots</url>
-		</repository>
-	</repositories>
-
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
@@ -70,7 +59,7 @@
 		<dependency>
 			<groupId>org.semanticweb.yars</groupId>
 			<artifactId>nxparser</artifactId>
-			<version>1.2.strictNulls-SNAPSHOT</version>
+			<version>1.2.10</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.ant</groupId>

@@ -12,7 +12,7 @@ this project, but instead are separately downloaded from the respective provider
   http://hadoop.apache.org/
  
 * NxParser version 1.2.x (BSD - http://www.opensource.org/licenses/bsd-license.php)
-  http://code.google.com/p/nxparser/
+  https://github.com/nxparser/nxparser
   
 * MG4j version 5.1 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
   http://mg4j.dsi.unimi.it/
